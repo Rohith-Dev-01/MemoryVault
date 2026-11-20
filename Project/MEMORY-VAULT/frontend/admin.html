@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administrator Dashboard — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="admin.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="#pending" class="active" data-top-section="pending">Pending Requests</a>
+        <a href="#history" data-top-section="history">Decision History</a>
+        <a href="#audit" data-top-section="audit">Audit Action Logs</a>
+        <a href="legacy-access.html">Contact Portal</a>
+      </nav>
+      <div class="header-actions">
+        <button type="button" class="btn btn-outline btn-sm" data-logout-btn>Sign Out</button>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <!-- Dedicated Administrator-Only Sidebar (Zero Vault User Links) -->
+      <aside id="admin-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row">
+          <div>
+            <div class="editorial-kicker">Administrator Verification Console</div>
+            <h1 id="admin-section-title" style="font-size:2.1rem;">Pending Legacy Requests</h1>
+            <p id="admin-welcome-sub">Review formal legacy access requests, verify evidence, and record immutable audit decisions.</p>
+          </div>
+          <div id="history-filter-bar" class="segmented-bar" role="tablist" aria-label="Filter decisions" style="display:none;">
+            <button type="button" class="segmented-btn active" data-history-filter="all_decided">All Decided</button>
+            <button type="button" class="segmented-btn" data-history-filter="approved">Approved</button>
+            <button type="button" class="segmented-btn" data-history-filter="rejected">Rejected</button>
+          </div>
+        </div>
+
+        <!-- Admin KPI Strip -->
+        <div class="metrics-grid">
+          <div class="metric-tile">
+            <span class="metric-label">Pending Review</span>
+            <span id="stat-pending" class="metric-value">0</span>
+            <span class="metric-meta">Awaiting verification</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Approved Releases</span>
+            <span id="stat-approved" class="metric-value">0</span>
+            <span class="metric-meta">Scoped to authorized items</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Rejected Requests</span>
+            <span id="stat-rejected" class="metric-value">0</span>
+            <span class="metric-meta">Vault remained sealed</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">System Notices</span>
+            <span id="stat-notifs" class="metric-value">0</span>
+            <span id="stat-users-sub" class="metric-meta">0 registered vault users</span>
+          </div>
+        </div>
+
+        <!-- Section 1 & 2: Requests Queue (Pending or Approved/Rejected History) -->
+        <div id="panel-requests">
+          <div id="admin-requests-list" style="display:flex;flex-direction:column;gap:18px;">
+            <div class="card" style="color:var(--text-secondary);">Loading verification queue…</div>
+          </div>
+        </div>
+
+        <!-- Section 3: Audit Action Logs -->
+        <div id="panel-audit" class="card" style="display:none;">
+          <h2 style="margin-bottom:6px;">Administrator Audit Action Logs</h2>
+          <p style="font-size:0.9rem;margin-bottom:18px;">Permanent chronological record of every approval and rejection decision.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Request Code</th>
+                  <th>Decision &amp; Reviewer</th>
+                  <th>Administrative Remarks</th>
+                </tr>
+              </thead>
+              <tbody id="audit-logs-body">
+                <tr><td colspan="4" style="color:var(--text-secondary);">Loading audit trail…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 4: System Notification Logs -->
+        <div id="panel-notifications" class="card" style="display:none;">
+          <h2 style="margin-bottom:6px;">System Notification Logs</h2>
+          <p style="font-size:0.9rem;margin-bottom:18px;">Recent inactivity reminders, contact invitations, and legacy decision notices.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Type</th>
+                  <th>Recipient</th>
+                  <th>Subject &amp; Delivery</th>
+                </tr>
+              </thead>
+              <tbody id="admin-notifs-body">
+                <tr><td colspan="4" style="color:var(--text-secondary);">Loading notifications…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Administrator Verification Console</div>
+      <div class="footer-links">
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+        <a href="index.html">Public Home</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      let activeSection = 'pending';
+      let historySubFilter = 'all_decided';
+      let cachedPayload = null;
+
+      window.MV_UI.renderAdminSidebar('pending', (section) => {
+        switchSection(section);
+      });
+
+      // Strict route guard: Vault Users -> dashboard.html; Unauthenticated -> login.html?role=admin
+      const admin = await window.MV_UI.requireAdminAuth();
+      if (!admin) return;
+
+      const { escapeHtml, formatDate, statusClass, toast } = window.MV_UI;
+
+      const titleEl = document.getElementById('admin-section-title');
+      const filterBar = document.getElementById('history-filter-bar');
+      const panelRequests = document.getElementById('panel-requests');
+      const panelAudit = document.getElementById('panel-audit');
+      const panelNotifs = document.getElementById('panel-notifications');
+
+      function syncTopNav(section) {
+        document.querySelectorAll('[data-top-section]').forEach((a) => {
+          a.classList.toggle('active', a.dataset.topSection === section);
+        });
+        document.querySelectorAll('[data-admin-section]').forEach((a) => {
+          a.classList.toggle('active', a.dataset.adminSection === section);
+        });
+      }
+
+      function switchSection(section) {
+        activeSection = section;
+        syncTopNav(section);
+
+        panelRequests.style.display = (section === 'pending' || section === 'history') ? 'block' : 'none';
+        panelAudit.style.display = section === 'audit' ? 'block' : 'none';
+        panelNotifs.style.display = section === 'notifications' ? 'block' : 'none';
+        filterBar.style.display = section === 'history' ? 'inline-flex' : 'none';
+
+        if (section === 'pending') {
+          titleEl.textContent = 'Pending Legacy Requests';
+        } else if (section === 'history') {
+          titleEl.textContent = 'Approved & Rejected History';
+        } else if (section === 'audit') {
+          titleEl.textContent = 'Audit Action Logs';
+        } else {
+          titleEl.textContent = 'System Notification Logs';
+        }
+
+        if (cachedPayload) {
+          renderCurrentView(cachedPayload);
+        }
+      }
+
+      document.querySelectorAll('[data-top-section]').forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          switchSection(link.dataset.topSection);
+        });
+      });
+
+      document.querySelectorAll('[data-history-filter]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-history-filter]').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          historySubFilter = btn.dataset.historyFilter;
+          if (cachedPayload) renderCurrentView(cachedPayload);
+        });
+      });
+
+      function renderRequestsList(requests) {
+        const listEl = document.getElementById('admin-requests-list');
+        if (requests.length === 0) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <h3>${activeSection === 'pending' ? 'No pending requests' : 'No reviewed requests found'}</h3>
+              <p>${activeSection === 'pending'
+                ? 'All legacy access requests have been reviewed. Check Approved / Rejected history or Audit Action Logs in the sidebar.'
+                : 'No requests match the selected decision filter yet.'}</p>
+            </div>`;
+          return;
+        }
+
+        listEl.innerHTML = requests.map((req) => `
+          <article class="card">
+            <div class="card-footer-row" style="margin-bottom:14px;">
+              <div>
+                <div class="meta-line">
+                  <span class="tabular"><strong>${escapeHtml(req.request_code)}</strong></span>
+                  <span class="meta-sep">·</span>
+                  <span>Submitted ${escapeHtml(formatDate(req.created_at, true))}</span>
+                  <span class="meta-sep">·</span>
+                  <span class="tabular">Owner inactive: ${escapeHtml(req.owner_days_inactive)} day(s)</span>
+                </div>
+                <h3 style="margin-top:6px;">${escapeHtml(req.reason)}</h3>
+              </div>
+              <span class="status-label ${statusClass(req.status)}">${escapeHtml(req.status.toUpperCase())}</span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:16px;">
+              <div class="card-sand" style="padding:14px 16px;font-size:0.88rem;">
+                <strong>Vault Owner</strong>
+                <div style="margin-top:4px;">${escapeHtml(req.owner_name)} (@${escapeHtml(req.owner_handle)})</div>
+                <div style="color:var(--text-secondary);">${escapeHtml(req.owner_email)}</div>
+                <div style="color:var(--text-secondary);margin-top:4px;" class="tabular">Last check-in: ${escapeHtml(formatDate(req.owner_last_check_in, true))} · Stage ${escapeHtml(req.owner_escalation_stage)}</div>
+              </div>
+              <div class="card-sand" style="padding:14px 16px;font-size:0.88rem;">
+                <strong>Requesting Trusted Contact</strong>
+                <div style="margin-top:4px;">${escapeHtml(req.contact_name)} (${escapeHtml(req.contact_relationship)})</div>
+                <div style="color:var(--text-secondary);">${escapeHtml(req.contact_email)}${req.contact_phone ? ` · ${escapeHtml(req.contact_phone)}` : ''}</div>
+                <div style="color:var(--text-secondary);margin-top:4px;">Invitation: ${escapeHtml(req.contact_invitation_status)} · Scoped release: ${escapeHtml(req.authorized_memories_count)} letter(s), ${escapeHtml(req.authorized_wishes_count)} wish(es)</div>
+              </div>
+            </div>
+
+            <p style="font-size:0.9rem;color:var(--text-primary);margin-bottom:16px;">
+              <strong>Verification Evidence / Note:</strong> ${escapeHtml(req.verification_note)}
+            </p>
+
+            <div class="form-group" style="margin-bottom:14px;">
+              <label for="remarks_${req.id}">Administrative Review Remarks (Recorded in Audit Trail)</label>
+              <textarea id="remarks_${req.id}" rows="2" placeholder="Document verification checks performed before approving or rejecting…">${escapeHtml(req.admin_remarks || '')}</textarea>
+            </div>
+
+            <div class="card-footer-row">
+              <div class="form-actions" style="margin-top:0;">
+                <button type="button" class="btn btn-primary btn-sm" data-review-id="${req.id}" data-decision="approved">Approve Scoped Release</button>
+                <button type="button" class="btn btn-danger btn-sm" data-review-id="${req.id}" data-decision="rejected">Reject Request</button>
+              </div>
+              ${req.reviewed_at ? `<span class="meta-line">Last reviewed ${escapeHtml(formatDate(req.reviewed_at, true))} by ${escapeHtml(req.reviewer_name || 'Admin')}</span>` : ''}
+            </div>
+          </article>
+        `).join('');
+
+        listEl.querySelectorAll('[data-review-id]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const requestId = Number(btn.dataset.reviewId);
+            const decision = btn.dataset.decision;
+            const remarks = document.getElementById(`remarks_${requestId}`).value.trim();
+
+            if (remarks.length < 4) {
+              toast('Please enter administrative review remarks (minimum 4 characters).', 'warning');
+              return;
+            }
+
+            btn.disabled = true;
+            try {
+              const r = await window.MV_API.request('admin.php?action=review', {
+                method: 'POST',
+                body: { request_id: requestId, decision, admin_remarks: remarks }
+              });
+              toast(r.message);
+              await loadAdminData();
+            } catch (err) {
+              toast(err.message || 'Review update failed.', 'error');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      function renderCurrentView(res) {
+        const allReqs = res.requests || [];
+
+        if (activeSection === 'pending') {
+          renderRequestsList(allReqs.filter((r) => r.status === 'pending'));
+        } else if (activeSection === 'history') {
+          const decided = allReqs.filter((r) => {
+            if (historySubFilter === 'approved') return r.status === 'approved';
+            if (historySubFilter === 'rejected') return r.status === 'rejected';
+            return r.status === 'approved' || r.status === 'rejected';
+          });
+          renderRequestsList(decided);
+        }
+
+        const auditBody = document.getElementById('audit-logs-body');
+        const logs = res.audit_logs || [];
+        auditBody.innerHTML = logs.length === 0
+          ? '<tr><td colspan="4" style="color:var(--text-secondary);">No administrative decisions recorded yet.</td></tr>'
+          : logs.map((a) => `
+              <tr>
+                <td class="tabular" style="font-size:0.84rem;white-space:nowrap;">${escapeHtml(formatDate(a.created_at, true))}</td>
+                <td class="tabular" style="font-weight:600;font-size:0.86rem;">${escapeHtml(a.request_code || '—')}</td>
+                <td style="font-size:0.86rem;">
+                  <span class="status-label ${statusClass(a.action.includes('approved') ? 'approved' : 'rejected')}">
+                    ${escapeHtml(a.action.replace(/_/g, ' '))}
+                  </span>
+                  <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">${escapeHtml(a.admin_name)}</div>
+                </td>
+                <td style="font-size:0.88rem;">${escapeHtml(a.remarks)}</td>
+              </tr>
+            `).join('');
+
+        const notifBody = document.getElementById('admin-notifs-body');
+        const notifs = res.notifications || [];
+        notifBody.innerHTML = notifs.length === 0
+          ? '<tr><td colspan="4" style="color:var(--text-secondary);">No system notifications logged yet.</td></tr>'
+          : notifs.map((n) => `
+              <tr>
+                <td class="tabular" style="font-size:0.84rem;white-space:nowrap;">${escapeHtml(formatDate(n.created_at, true))}</td>
+                <td style="font-size:0.84rem;">${escapeHtml(n.notification_type.replace(/_/g, ' '))}</td>
+                <td style="font-size:0.84rem;">${escapeHtml(n.recipient_email)}</td>
+                <td style="font-size:0.86rem;">
+                  <div>${escapeHtml(n.subject)}</div>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">Status: ${escapeHtml(n.delivery_status)}</div>
+                </td>
+              </tr>
+            `).join('');
+      }
+
+      async function loadAdminData() {
+        try {
+          const res = await window.MV_API.request('admin.php?status=all');
+          cachedPayload = res;
+
+          document.getElementById('admin-welcome-sub').textContent =
+            `Signed in as ${res.admin.full_name} (${res.admin.email}) · Review verification evidence before authorizing scoped legacy releases.`;
+
+          document.getElementById('stat-pending').textContent = res.stats.pending;
+          document.getElementById('stat-approved').textContent = res.stats.approved;
+          document.getElementById('stat-rejected').textContent = res.stats.rejected;
+          document.getElementById('stat-notifs').textContent = res.stats.total_notifications;
+          document.getElementById('stat-users-sub').textContent = `${res.stats.total_users} registered vault user${res.stats.total_users === 1 ? '' : 's'}`;
+
+          renderCurrentView(res);
+        } catch (err) {
+          if (err.status === 401) {
+            window.location.replace('login.html?role=admin');
+          } else if (err.status === 403) {
+            window.location.replace('dashboard.html');
+          } else {
+            toast(err.message || 'Unable to load administrator console.', 'error');
+          }
+        }
+      }
+
+      await loadAdminData();
+    })();
+  </script>
+</body>
+</html>

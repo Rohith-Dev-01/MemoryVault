@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memories &amp; Letters — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="dashboard.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html">Assets</a>
+        <a href="wishes.html">Wishes</a>
+        <a href="contacts.html">Contacts</a>
+        <a href="memories.html" class="active">Memories</a>
+      </nav>
+      <div class="header-actions">
+        <a href="summary.html" class="btn btn-outline btn-sm">Printable Summary</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <aside id="vault-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row">
+          <div>
+            <div class="editorial-kicker">Module 04 · Personal Archive</div>
+            <h1 style="font-size:2.1rem;">Memories &amp; Farewell Letters</h1>
+            <p>Compose timeless personal messages addressed to trusted contacts or loved ones, released only after explicit administrative verification.</p>
+          </div>
+          <a href="summary.html" class="btn btn-outline btn-sm">Preview Dossier</a>
+        </div>
+
+        <!-- Compose / Edit Letter Card -->
+        <div class="card">
+          <h2 id="memory-form-title" style="margin-bottom:18px;">Compose a Farewell Letter or Memory</h2>
+          <form id="memory-form">
+            <input type="hidden" id="memory_id" value="" />
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="m_title">Letter Title</label>
+                <input id="m_title" type="text" required placeholder="e.g., For Meera — Keep the Cameras Rolling" />
+              </div>
+
+              <div class="form-group">
+                <label for="m_contact">Link to Trusted Contact</label>
+                <select id="m_contact">
+                  <option value="">None (use custom recipient below)</option>
+                </select>
+                <span class="field-hint">Linking a trusted contact authorizes them to view this letter once an admin approves their legacy request.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="m_custom_recipient">Custom Recipient Label (Optional)</label>
+                <input id="m_custom_recipient" type="text" placeholder="e.g., Mom & Dad, Younger Brother" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="m_release_condition">Release Condition</label>
+                <select id="m_release_condition">
+                  <option value="Upon verified admin approval">Upon verified admin approval</option>
+                  <option value="Upon verified admin approval — Share with family">Upon verified admin approval — Share with family</option>
+                  <option value="Upon verified admin approval — Deliver on milestone date">Upon verified admin approval — Deliver on milestone date</option>
+                </select>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="m_body">Message Body</label>
+                <textarea id="m_body" rows="6" required placeholder="Write from the heart…"></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:18px;">
+              <button id="memory-save-btn" type="submit" class="btn btn-primary">Preserve Letter</button>
+              <button id="memory-cancel-btn" type="button" class="btn btn-ghost" style="display:none;">Cancel Edit</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Saved Memories Editorial Grid -->
+        <div>
+          <div class="card-footer-row" style="margin-bottom:16px;">
+            <h2>Preserved Letters</h2>
+            <span id="memories-count-label" class="meta-line">0 letters</span>
+          </div>
+          <div id="memories-list" class="letters-grid"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="contacts.html">Trusted Contacts</a>
+        <a href="summary.html">Printable Summary</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      window.MV_UI.renderSidebar('memories');
+      const user = await window.MV_UI.requireAuth();
+      if (!user) return;
+
+      const { escapeHtml, formatDate, toast } = window.MV_UI;
+      let memoriesCache = [];
+      let contactsCache = [];
+
+      const form = document.getElementById('memory-form');
+      const idInput = document.getElementById('memory_id');
+      const contactSelect = document.getElementById('m_contact');
+      const formTitle = document.getElementById('memory-form-title');
+      const saveBtn = document.getElementById('memory-save-btn');
+      const cancelBtn = document.getElementById('memory-cancel-btn');
+
+      function resetForm() {
+        form.reset();
+        idInput.value = '';
+        formTitle.textContent = 'Compose a Farewell Letter or Memory';
+        saveBtn.textContent = 'Preserve Letter';
+        cancelBtn.style.display = 'none';
+      }
+
+      cancelBtn.addEventListener('click', resetForm);
+
+      function populateContactSelect() {
+        contactSelect.innerHTML = '<option value="">None (use custom recipient below)</option>' +
+          contactsCache.map((c) => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.relationship)})</option>`).join('');
+      }
+
+      function renderMemories() {
+        const host = document.getElementById('memories-list');
+        document.getElementById('memories-count-label').textContent = `${memoriesCache.length} letter${memoriesCache.length === 1 ? '' : 's'}`;
+
+        if (memoriesCache.length === 0) {
+          host.className = '';
+          host.innerHTML = `
+            <div class="empty-state">
+              <h3>No letters preserved yet</h3>
+              <p>Compose a personal memory or farewell note above to leave words of warmth and clarity for the people who matter most.</p>
+            </div>`;
+          return;
+        }
+
+        host.className = 'letters-grid';
+        host.innerHTML = memoriesCache.map((m) => {
+          const recipientParts = [];
+          if (m.contact_name) recipientParts.push(`${m.contact_name} (${m.contact_relationship})`);
+          if (m.custom_recipient) recipientParts.push(m.custom_recipient);
+          const recipientDisplay = recipientParts.join(' · ') || 'Unspecified recipient';
+
+          return `
+            <article class="letter-card">
+              <div>
+                <div class="meta-line" style="margin-bottom:6px;">
+                  <span>To: ${escapeHtml(recipientDisplay)}</span>
+                </div>
+                <h3>${escapeHtml(m.title)}</h3>
+              </div>
+
+              <div class="letter-body">${escapeHtml(m.message_body)}</div>
+
+              <div class="card-footer-row">
+                <div class="meta-line">
+                  <span>${escapeHtml(m.release_condition)}</span>
+                  <span class="meta-sep">·</span>
+                  <span>${escapeHtml(formatDate(m.updated_at || m.created_at, false))}</span>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button type="button" class="btn btn-outline btn-sm" data-edit-id="${m.id}">Edit</button>
+                  <button type="button" class="btn btn-danger btn-sm" data-delete-id="${m.id}">Delete</button>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
+
+        host.querySelectorAll('[data-edit-id]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const m = memoriesCache.find((x) => Number(x.id) === Number(btn.dataset.editId));
+            if (!m) return;
+            idInput.value = m.id;
+            document.getElementById('m_title').value = m.title;
+            contactSelect.value = m.trusted_contact_id || '';
+            document.getElementById('m_custom_recipient').value = m.custom_recipient || '';
+            document.getElementById('m_release_condition').value = m.release_condition || 'Upon verified admin approval';
+            document.getElementById('m_body').value = m.message_body;
+            formTitle.textContent = `Edit Letter: ${m.title}`;
+            saveBtn.textContent = 'Update Letter';
+            cancelBtn.style.display = 'inline-flex';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        });
+
+        host.querySelectorAll('[data-delete-id]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.deleteId);
+            btn.disabled = true;
+            try {
+              await window.MV_API.request(`memories.php?id=${id}`, { method: 'DELETE' });
+              toast('Letter removed from vault.');
+              if (Number(idInput.value) === id) resetForm();
+              await loadMemories();
+            } catch (err) {
+              toast(err.message || 'Delete failed.', 'error');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadMemories() {
+        try {
+          const res = await window.MV_API.request('memories.php');
+          memoriesCache = res.memories || [];
+          contactsCache = res.contacts || [];
+          populateContactSelect();
+          renderMemories();
+        } catch (err) {
+          toast(err.message || 'Could not load letters.', 'error');
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const cid = contactSelect.value;
+        const payload = {
+          title: document.getElementById('m_title').value.trim(),
+          trusted_contact_id: cid ? Number(cid) : null,
+          custom_recipient: document.getElementById('m_custom_recipient').value.trim(),
+          release_condition: document.getElementById('m_release_condition').value,
+          message_body: document.getElementById('m_body').value.trim()
+        };
+
+        const editId = idInput.value;
+        saveBtn.disabled = true;
+
+        try {
+          if (editId) {
+            payload.id = Number(editId);
+            await window.MV_API.request('memories.php', { method: 'PUT', body: payload });
+            toast('Letter updated.');
+          } else {
+            await window.MV_API.request('memories.php', { method: 'POST', body: payload });
+            toast('Letter preserved in your vault.');
+          }
+          resetForm();
+          await loadMemories();
+        } catch (err) {
+          toast(err.message || 'Could not save letter.', 'error');
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      await loadMemories();
+    })();
+  </script>
+</body>
+</html>

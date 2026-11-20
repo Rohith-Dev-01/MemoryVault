@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="index.html">Home</a>
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+        <a href="login.html" class="active">Sign In</a>
+        <a href="register.html">Register</a>
+      </nav>
+      <div class="header-actions">
+        <a href="register.html" class="btn btn-primary btn-sm">Create Vault</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container">
+      <div class="auth-wrapper card">
+        <div class="auth-header">
+          <div id="login-kicker" class="editorial-kicker">Vault Access</div>
+          <h1 id="login-heading" style="font-size:2rem;">Welcome back</h1>
+          <p id="login-subtitle">Choose your account role below to sign in to your private Vault Dashboard or the Administrator Verification Console.</p>
+        </div>
+
+        <!-- Explicit Role Selection Toggle -->
+        <div class="form-group" style="margin-bottom:20px;">
+          <label id="role-toggle-label">Sign in as</label>
+          <div class="segmented-bar" role="tablist" aria-labelledby="role-toggle-label" style="width:100%;display:grid;grid-template-columns:1fr 1fr;">
+            <button type="button" id="role-btn-user" class="segmented-btn active" role="tab" aria-selected="true" data-role="user">
+              Vault User
+            </button>
+            <button type="button" id="role-btn-admin" class="segmented-btn" role="tab" aria-selected="false" data-role="admin">
+              Administrator
+            </button>
+          </div>
+        </div>
+
+        <div id="login-error" class="notice-box notice-error" style="display:none;margin-bottom:18px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="login-error-text"></span>
+        </div>
+
+        <form id="login-form" novalidate>
+          <input type="hidden" id="selected_role" name="role" value="user" />
+          <div class="form-grid" style="grid-template-columns:1fr;">
+            <div class="form-group">
+              <label id="identifier-label" for="identifier">Email Address or User ID</label>
+              <input id="identifier" name="identifier" type="text" required placeholder="demo@memoryvault.com or aarav_mehta" autocomplete="username" />
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" required placeholder="Enter your password" autocomplete="current-password" />
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top:22px;">
+            <button id="login-submit" type="submit" class="btn btn-primary btn-lg" style="width:100%;">
+              Sign In as Vault User
+            </button>
+          </div>
+        </form>
+
+        <div class="demo-credentials">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div id="demo-creds-text">
+              <strong>Seeded Vault User Demo</strong><br />
+              Email: <code>demo@memoryvault.com</code> (or <code>aarav_mehta</code>)<br />
+              Password: <code>Demo@1234</code>
+            </div>
+            <button id="fill-demo-btn" type="button" class="btn btn-outline btn-sm">Fill Demo</button>
+          </div>
+        </div>
+
+        <p id="register-footer-link" style="margin-top:20px;font-size:0.9rem;text-align:center;">
+          New to Memory Vault? <a href="register.html" style="font-weight:600;">Create a Vault User account</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+        <a href="register.html">Create Vault</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      // Redirect already-authenticated sessions straight to their role dashboard
+      try {
+        const session = await window.MV_API.initSession();
+        if (session.role === 'admin' && session.admin_authenticated) {
+          window.location.replace('admin.html');
+          return;
+        }
+        if (session.role === 'user' && session.authenticated) {
+          window.location.replace('dashboard.html');
+          return;
+        }
+      } catch (e) {}
+
+      const roleInput = document.getElementById('selected_role');
+      const btnUser = document.getElementById('role-btn-user');
+      const btnAdmin = document.getElementById('role-btn-admin');
+      const kickerEl = document.getElementById('login-kicker');
+      const headingEl = document.getElementById('login-heading');
+      const subtitleEl = document.getElementById('login-subtitle');
+      const idLabel = document.getElementById('identifier-label');
+      const idInput = document.getElementById('identifier');
+      const pwInput = document.getElementById('password');
+      const submitBtn = document.getElementById('login-submit');
+      const demoCredsEl = document.getElementById('demo-creds-text');
+      const registerLink = document.getElementById('register-footer-link');
+      const errBox = document.getElementById('login-error');
+      const errText = document.getElementById('login-error-text');
+
+      let activeRole = 'user';
+
+      function applyRole(role) {
+        activeRole = role === 'admin' ? 'admin' : 'user';
+        roleInput.value = activeRole;
+        errBox.style.display = 'none';
+
+        const isAdmin = activeRole === 'admin';
+        btnUser.classList.toggle('active', !isAdmin);
+        btnUser.setAttribute('aria-selected', String(!isAdmin));
+        btnAdmin.classList.toggle('active', isAdmin);
+        btnAdmin.setAttribute('aria-selected', String(isAdmin));
+
+        if (isAdmin) {
+          kickerEl.textContent = 'Governance Console Access';
+          headingEl.textContent = 'Administrator Sign In';
+          subtitleEl.textContent = 'Sign in with provisioned administrator credentials to review legacy verification requests and audit logs.';
+          idLabel.textContent = 'Administrator Email';
+          idInput.placeholder = 'admin@memoryvault.com';
+          submitBtn.textContent = 'Sign In as Administrator';
+          demoCredsEl.innerHTML =
+            '<strong>Seeded Administrator Demo</strong><br />' +
+            'Email: <code>admin@memoryvault.com</code><br />' +
+            'Password: <code>Admin@1234</code>';
+          registerLink.innerHTML =
+            'Administrator accounts are provisioned in the database. Looking for a personal vault? <a href="register.html" style="font-weight:600;">Register as Vault User</a>';
+        } else {
+          kickerEl.textContent = 'Personal Vault Access';
+          headingEl.textContent = 'Welcome back';
+          subtitleEl.textContent = 'Sign in with your email address or User ID. Signing in automatically confirms your activity and resets your inactivity timer.';
+          idLabel.textContent = 'Email Address or User ID';
+          idInput.placeholder = 'demo@memoryvault.com or aarav_mehta';
+          submitBtn.textContent = 'Sign In as Vault User';
+          demoCredsEl.innerHTML =
+            '<strong>Seeded Vault User Demo</strong><br />' +
+            'Email: <code>demo@memoryvault.com</code> (or <code>aarav_mehta</code>)<br />' +
+            'Password: <code>Demo@1234</code>';
+          registerLink.innerHTML =
+            'New to Memory Vault? <a href="register.html" style="font-weight:600;">Create a Vault User account</a>';
+        }
+      }
+
+      btnUser.addEventListener('click', () => {
+        idInput.value = '';
+        pwInput.value = '';
+        applyRole('user');
+      });
+
+      btnAdmin.addEventListener('click', () => {
+        idInput.value = '';
+        pwInput.value = '';
+        applyRole('admin');
+      });
+
+      // Respect ?role=admin query parameter when linked from Admin nav or guards
+      const urlRole = new URLSearchParams(window.location.search).get('role');
+      applyRole(urlRole === 'admin' ? 'admin' : 'user');
+
+      document.getElementById('fill-demo-btn').addEventListener('click', () => {
+        errBox.style.display = 'none';
+        if (activeRole === 'admin') {
+          idInput.value = 'admin@memoryvault.com';
+          pwInput.value = 'Admin@1234';
+        } else {
+          idInput.value = 'demo@memoryvault.com';
+          pwInput.value = 'Demo@1234';
+        }
+      });
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.style.display = 'none';
+
+        const identifier = idInput.value.trim();
+        const password = pwInput.value;
+
+        if (!identifier || !password) {
+          errText.textContent = 'Please enter both your account identifier and password.';
+          errBox.style.display = 'flex';
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = activeRole === 'admin' ? 'Verifying administrator…' : 'Signing in…';
+
+        try {
+          const res = await window.MV_API.request('auth.php?action=login', {
+            method: 'POST',
+            body: { identifier, password, role: activeRole }
+          });
+          window.MV_UI.toast(res.message || 'Signed in successfully.');
+          const target = res.redirect || (res.role === 'admin' ? 'admin.html' : 'dashboard.html');
+          setTimeout(() => { window.location.replace(target); }, 300);
+        } catch (err) {
+          errText.textContent = err.message || 'Sign in failed.';
+          errBox.style.display = 'flex';
+          submitBtn.disabled = false;
+          submitBtn.textContent = activeRole === 'admin' ? 'Sign In as Administrator' : 'Sign In as Vault User';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

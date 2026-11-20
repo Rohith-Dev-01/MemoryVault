@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Assets — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="dashboard.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html" class="active">Assets</a>
+        <a href="wishes.html">Wishes</a>
+        <a href="contacts.html">Contacts</a>
+        <a href="memories.html">Memories</a>
+      </nav>
+      <div class="header-actions">
+        <a href="wishes.html" class="btn btn-outline btn-sm">Assign Final Wishes</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <aside id="vault-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row">
+          <div>
+            <div class="editorial-kicker">Module 01 · Inventory</div>
+            <h1 style="font-size:2.1rem;">Digital Assets</h1>
+            <p>Maintain a clear inventory of your online accounts, cloud libraries, and recurring subscriptions.</p>
+          </div>
+          <a href="wishes.html" class="btn btn-outline btn-sm">Configure Wishes</a>
+        </div>
+
+        <!-- Mandatory Security Notice -->
+        <div class="notice-box notice-warning" role="note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div>
+            <strong>Security Policy — Never Enter Passwords:</strong> Memory Vault never collects or stores third-party account passwords, PINs, or recovery codes. Record only account identifiers (email address or username) and stewardship notes so trusted contacts can work through official provider legacy channels.
+          </div>
+        </div>
+
+        <!-- Add / Edit Asset Form -->
+        <div class="card">
+          <h2 id="asset-form-title" style="margin-bottom:18px;">Add Digital Asset</h2>
+          <form id="asset-form">
+            <input type="hidden" id="asset_id" value="" />
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="asset_name">Asset Name</label>
+                <input id="asset_name" type="text" required placeholder="e.g., Family Photo Archive" />
+              </div>
+
+              <div class="form-group">
+                <label for="platform">Platform</label>
+                <input id="platform" type="text" required placeholder="e.g., Instagram, Gmail, Google Drive, iCloud" />
+              </div>
+
+              <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" required>
+                  <option value="Social Media">Social Media</option>
+                  <option value="Email">Email</option>
+                  <option value="Cloud Photos">Cloud Photos</option>
+                  <option value="Cloud Storage">Cloud Storage</option>
+                  <option value="Subscriptions">Subscriptions</option>
+                  <option value="Domains & Creative">Domains &amp; Creative</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="account_identifier">Account Identifier (Email or Username)</label>
+                <input id="account_identifier" type="text" required placeholder="e.g., @username or name@gmail.com" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="notes">Notes &amp; Description (Do NOT enter passwords)</label>
+                <textarea id="notes" placeholder="Describe important albums, folders, or official legacy settings configured on this platform…"></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:18px;">
+              <button id="asset-save-btn" type="submit" class="btn btn-primary">Save Digital Asset</button>
+              <button id="asset-cancel-btn" type="button" class="btn btn-ghost" style="display:none;">Cancel Edit</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Saved Digital Assets List -->
+        <div>
+          <div class="card-footer-row" style="margin-bottom:14px;">
+            <h2>Saved Digital Assets</h2>
+            <span id="assets-count-label" class="meta-line">0 assets</span>
+          </div>
+          <div id="assets-list"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="wishes.html">Final Wishes</a>
+        <a href="summary.html">Printable Summary</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      window.MV_UI.renderSidebar('assets');
+      const user = await window.MV_UI.requireAuth();
+      if (!user) return;
+
+      const { escapeHtml, wishLabel, toast } = window.MV_UI;
+      let assetsCache = [];
+
+      const form = document.getElementById('asset-form');
+      const idInput = document.getElementById('asset_id');
+      const formTitle = document.getElementById('asset-form-title');
+      const saveBtn = document.getElementById('asset-save-btn');
+      const cancelBtn = document.getElementById('asset-cancel-btn');
+
+      function resetForm() {
+        form.reset();
+        idInput.value = '';
+        formTitle.textContent = 'Add Digital Asset';
+        saveBtn.textContent = 'Save Digital Asset';
+        cancelBtn.style.display = 'none';
+      }
+
+      cancelBtn.addEventListener('click', resetForm);
+
+      function renderAssets() {
+        const container = document.getElementById('assets-list');
+        document.getElementById('assets-count-label').textContent = `${assetsCache.length} asset${assetsCache.length === 1 ? '' : 's'}`;
+
+        if (assetsCache.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <h3>No digital assets recorded yet</h3>
+              <p>Add your first account above—such as Google Photos, Gmail, Instagram, or cloud subscriptions—so your final wishes can be assigned clearly.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Asset &amp; Platform</th>
+                  <th>Account Identifier</th>
+                  <th>Final Wish Status</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${assetsCache.map((a) => `
+                  <tr>
+                    <td>
+                      <div style="font-weight:600;">${escapeHtml(a.asset_name)}</div>
+                      <div class="meta-line" style="margin-top:2px;">
+                        <span>${escapeHtml(a.platform)}</span>
+                        <span class="meta-sep">·</span>
+                        <span>${escapeHtml(a.category)}</span>
+                      </div>
+                      ${a.notes ? `<div style="font-size:0.84rem;color:var(--text-secondary);margin-top:6px;max-width:44ch;">${escapeHtml(a.notes)}</div>` : ''}
+                    </td>
+                    <td style="font-size:0.9rem;"><code>${escapeHtml(a.account_identifier)}</code></td>
+                    <td>
+                      ${a.wish_action_type
+                        ? `<span class="status-label status-success">${escapeHtml(wishLabel(a.wish_action_type))}</span>`
+                        : `<a href="wishes.html" style="font-size:0.84rem;font-weight:500;color:var(--accent-terracotta);">Assign wish →</a>`}
+                    </td>
+                    <td style="text-align:right;white-space:nowrap;">
+                      <button type="button" class="btn btn-outline btn-sm" data-edit-id="${a.id}">Edit</button>
+                      <button type="button" class="btn btn-danger btn-sm" data-delete-id="${a.id}">Delete</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        container.querySelectorAll('[data-edit-id]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const item = assetsCache.find((x) => Number(x.id) === Number(btn.dataset.editId));
+            if (!item) return;
+            idInput.value = item.id;
+            document.getElementById('asset_name').value = item.asset_name;
+            document.getElementById('platform').value = item.platform;
+            document.getElementById('category').value = item.category;
+            document.getElementById('account_identifier').value = item.account_identifier;
+            document.getElementById('notes').value = item.notes || '';
+            formTitle.textContent = `Edit Asset: ${item.asset_name}`;
+            saveBtn.textContent = 'Update Asset';
+            cancelBtn.style.display = 'inline-flex';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        });
+
+        container.querySelectorAll('[data-delete-id]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.deleteId);
+            btn.disabled = true;
+            try {
+              await window.MV_API.request(`assets.php?id=${id}`, { method: 'DELETE' });
+              toast('Digital asset removed.');
+              if (Number(idInput.value) === id) resetForm();
+              await loadAssets();
+            } catch (err) {
+              toast(err.message || 'Delete failed.', 'error');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadAssets() {
+        try {
+          const res = await window.MV_API.request('assets.php');
+          assetsCache = res.assets || [];
+          renderAssets();
+        } catch (err) {
+          toast(err.message || 'Could not load digital assets.', 'error');
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          asset_name: document.getElementById('asset_name').value.trim(),
+          platform: document.getElementById('platform').value.trim(),
+          category: document.getElementById('category').value,
+          account_identifier: document.getElementById('account_identifier').value.trim(),
+          notes: document.getElementById('notes').value.trim()
+        };
+
+        const editId = idInput.value;
+        saveBtn.disabled = true;
+
+        try {
+          if (editId) {
+            payload.id = Number(editId);
+            await window.MV_API.request('assets.php', { method: 'PUT', body: payload });
+            toast('Digital asset updated.');
+          } else {
+            await window.MV_API.request('assets.php', { method: 'POST', body: payload });
+            toast('Digital asset added to your vault.');
+          }
+          resetForm();
+          await loadAssets();
+        } catch (err) {
+          toast(err.message || 'Could not save asset.', 'error');
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      await loadAssets();
+    })();
+  </script>
+</body>
+</html>

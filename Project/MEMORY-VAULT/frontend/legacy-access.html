@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trusted Contact Legacy Access Portal — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="index.html">Home</a>
+        <a href="legacy-access.html" class="active">Trusted Contact Portal</a>
+        <a href="admin.html">Admin Panel</a>
+        <a href="login.html">Vault Sign In</a>
+      </nav>
+      <div class="header-actions">
+        <a href="admin.html" class="btn btn-outline btn-sm">Admin Verification</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container" style="max-width:1040px;display:flex;flex-direction:column;gap:28px;">
+      <div class="page-heading-row">
+        <div>
+          <div class="editorial-kicker">Trusted Contact Portal</div>
+          <h1 style="font-size:2.2rem;">Legacy Access Requests</h1>
+          <p>Submit a formal stewardship verification request or check the status of an existing request.</p>
+        </div>
+      </div>
+
+      <!-- Critical Governance Rule Banner -->
+      <div class="notice-box notice-warning" role="note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div>
+          <strong>Important Governance Rule:</strong> Extended account inactivity is <strong>not</strong> proof of death. Memory Vault never automatically releases private letters or final wishes. Every request is reviewed manually by an administrator, and upon approval, only the specific memories and instructions explicitly designated for you become visible.
+        </div>
+      </div>
+
+      <div class="grid-2" style="align-items:start;">
+        <!-- Panel 1: Check Status & View Approved Authorized Content -->
+        <div class="card">
+          <h2 style="margin-bottom:8px;">Check Request Status</h2>
+          <p style="font-size:0.9rem;margin-bottom:18px;">Enter your trusted contact email and the vault owner's email or User ID to view approval status and any explicitly authorized items.</p>
+
+          <form id="lookup-form">
+            <div class="form-grid" style="grid-template-columns:1fr;">
+              <div class="form-group">
+                <label for="l_contact_email">Your Trusted Contact Email</label>
+                <input id="l_contact_email" type="email" required placeholder="meera.mehta@example.com" />
+              </div>
+              <div class="form-group">
+                <label for="l_owner_id">Vault Owner Email or User ID</label>
+                <input id="l_owner_id" type="text" required placeholder="demo@memoryvault.com or aarav_mehta" />
+              </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:16px;">
+              <button id="lookup-btn" type="submit" class="btn btn-primary">Check Status</button>
+              <button id="fill-lookup-demo" type="button" class="btn btn-outline btn-sm">Fill Seeded Demo</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Panel 2: Submit New Legacy Access Request -->
+        <div class="card">
+          <h2 style="margin-bottom:8px;">Submit New Access Request</h2>
+          <p style="font-size:0.9rem;margin-bottom:18px;">Only registered Trusted Contacts may request administrative review of a vault owner's authorized legacy items.</p>
+
+          <form id="submit-request-form">
+            <div class="form-grid" style="grid-template-columns:1fr;">
+              <div class="form-group">
+                <label for="r_contact_email">Your Trusted Contact Email</label>
+                <input id="r_contact_email" type="email" required placeholder="rohan.kulkarni@example.com" />
+              </div>
+              <div class="form-group">
+                <label for="r_owner_id">Vault Owner Email or User ID</label>
+                <input id="r_owner_id" type="text" required placeholder="demo@memoryvault.com or aarav_mehta" />
+              </div>
+              <div class="form-group">
+                <label for="r_reason">Reason for Request</label>
+                <input id="r_reason" type="text" required placeholder="e.g., Family executor request for digital archive instructions" />
+              </div>
+              <div class="form-group">
+                <label for="r_note">Verification Note &amp; Reference Details</label>
+                <textarea id="r_note" required placeholder="Provide context, family verification reference, or documentation details for the administrator…"></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:16px;">
+              <button id="submit-req-btn" type="submit" class="btn btn-accent">Submit for Admin Review</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Lookup Results & Authorized Release Area -->
+      <div id="lookup-results"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="login.html">Vault Sign In</a>
+        <a href="admin.html">Admin Verification Panel</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      const { escapeHtml, formatDate, statusClass, wishLabel, toast } = window.MV_UI;
+      await window.MV_API.initSession().catch(() => {});
+
+      const resultsHost = document.getElementById('lookup-results');
+
+      document.getElementById('fill-lookup-demo').addEventListener('click', () => {
+        document.getElementById('l_contact_email').value = 'meera.mehta@example.com';
+        document.getElementById('l_owner_id').value = 'demo@memoryvault.com';
+      });
+
+      async function performLookup(contactEmail, ownerId) {
+        resultsHost.innerHTML = '<div class="card" style="color:var(--text-secondary);">Checking verification records…</div>';
+        try {
+          const res = await window.MV_API.request(
+            `legacy_requests.php?action=lookup&contact_email=${encodeURIComponent(contactEmail)}&owner_identifier=${encodeURIComponent(ownerId)}`
+          );
+
+          const requests = res.requests || [];
+          if (requests.length === 0) {
+            resultsHost.innerHTML = `
+              <div class="empty-state">
+                <h3>No legacy access requests found</h3>
+                <p>No requests have been submitted yet for ${escapeHtml(contactEmail)} on ${escapeHtml(res.owner.full_name)}'s vault.</p>
+              </div>`;
+            return;
+          }
+
+          resultsHost.innerHTML = requests.map((req) => {
+            const isApproved = req.status === 'approved';
+            const memories = req.authorized_memories || [];
+            const wishes = req.authorized_wishes || [];
+
+            return `
+              <article class="card" style="margin-bottom:20px;">
+                <div class="card-footer-row" style="margin-bottom:14px;">
+                  <div>
+                    <div class="meta-line">
+                      <span class="tabular"><strong>${escapeHtml(req.request_code)}</strong></span>
+                      <span class="meta-sep">·</span>
+                      <span>Vault Owner: ${escapeHtml(res.owner.full_name)}</span>
+                      <span class="meta-sep">·</span>
+                      <span>Submitted ${escapeHtml(formatDate(req.created_at, true))}</span>
+                    </div>
+                    <h2 style="margin-top:6px;">${escapeHtml(req.reason)}</h2>
+                  </div>
+                  <span class="status-label ${statusClass(req.status)}">${escapeHtml(req.status.toUpperCase())}</span>
+                </div>
+
+                <p style="font-size:0.9rem;margin-bottom:12px;"><strong>Verification Note:</strong> ${escapeHtml(req.verification_note)}</p>
+                ${req.admin_remarks
+                  ? `<div class="card-sand" style="padding:12px 16px;font-size:0.88rem;margin-bottom:16px;"><strong>Administrator Remarks:</strong> ${escapeHtml(req.admin_remarks)}</div>`
+                  : ''}
+
+                ${!isApproved ? `
+                  <div class="notice-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Private vault memories and final wishes remain sealed until an administrator explicitly approves this request.</span>
+                  </div>
+                ` : `
+                  <hr class="divider" />
+                  <div class="editorial-kicker">Approved Release · Authorized Exclusively for ${escapeHtml(req.contact_name)}</div>
+
+                  <h3 style="margin-top:10px;margin-bottom:12px;">Authorized Final Wishes (${wishes.length})</h3>
+                  ${wishes.length === 0
+                    ? '<p style="font-size:0.9rem;margin-bottom:18px;">No digital asset wishes were specifically assigned to you.</p>'
+                    : `
+                      <div class="table-wrap" style="margin-bottom:24px;">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Digital Asset</th>
+                              <th>Account Identifier</th>
+                              <th>Designated Action</th>
+                              <th>Stewardship Instructions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${wishes.map((w) => `
+                              <tr>
+                                <td><strong>${escapeHtml(w.asset_name)}</strong><div style="font-size:0.8rem;color:var(--text-secondary);">${escapeHtml(w.platform)}</div></td>
+                                <td><code>${escapeHtml(w.account_identifier)}</code></td>
+                                <td>${escapeHtml(wishLabel(w.action_type))}</td>
+                                <td style="font-size:0.88rem;">${escapeHtml(w.custom_instructions || w.notes || '—')}</td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    `}
+
+                  <h3 style="margin-bottom:12px;">Authorized Personal Letters &amp; Memories (${memories.length})</h3>
+                  ${memories.length === 0
+                    ? '<p style="font-size:0.9rem;">No personal letters were specifically addressed to you.</p>'
+                    : `
+                      <div class="letters-grid">
+                        ${memories.map((m) => `
+                          <div class="letter-card">
+                            <div>
+                              <div class="meta-line" style="margin-bottom:4px;">
+                                <span>${escapeHtml(m.release_condition)}</span>
+                                ${m.custom_recipient ? `<span class="meta-sep">·</span><span>${escapeHtml(m.custom_recipient)}</span>` : ''}
+                              </div>
+                              <h3>${escapeHtml(m.title)}</h3>
+                            </div>
+                            <div class="letter-body">${escapeHtml(m.message_body)}</div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    `}
+                `}
+              </article>
+            `;
+          }).join('');
+        } catch (err) {
+          resultsHost.innerHTML = `<div class="notice-box notice-error"><span>${escapeHtml(err.message || 'Lookup failed.')}</span></div>`;
+        }
+      }
+
+      document.getElementById('lookup-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('l_contact_email').value.trim();
+        const owner = document.getElementById('l_owner_id').value.trim();
+        await performLookup(email, owner);
+      });
+
+      document.getElementById('submit-request-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-req-btn');
+        const contact_email = document.getElementById('r_contact_email').value.trim();
+        const owner_identifier = document.getElementById('r_owner_id').value.trim();
+        const reason = document.getElementById('r_reason').value.trim();
+        const verification_note = document.getElementById('r_note').value.trim();
+
+        btn.disabled = true;
+        try {
+          const res = await window.MV_API.request('legacy_requests.php?action=submit', {
+            method: 'POST',
+            body: { contact_email, owner_identifier, reason, verification_note }
+          });
+          toast(res.message);
+          document.getElementById('submit-request-form').reset();
+          document.getElementById('l_contact_email').value = contact_email;
+          document.getElementById('l_owner_id').value = owner_identifier;
+          await performLookup(contact_email, owner_identifier);
+        } catch (err) {
+          toast(err.message || 'Could not submit request.', 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legacy Summary — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="dashboard.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html">Assets</a>
+        <a href="wishes.html">Wishes</a>
+        <a href="contacts.html">Contacts</a>
+        <a href="summary.html" class="active">Summary</a>
+      </nav>
+      <div class="header-actions">
+        <button id="header-print-btn" type="button" class="btn btn-primary btn-sm">Print / Save as PDF</button>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <aside id="vault-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row no-print">
+          <div>
+            <div class="editorial-kicker">Module 05 · Printable Dossier</div>
+            <h1 style="font-size:2.1rem;">Complete Legacy Summary</h1>
+            <p>Review your full digital legacy plan below. Use Print / Save as PDF for a clean archival copy with navigation automatically hidden.</p>
+          </div>
+          <button id="main-print-btn" type="button" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <span>Print / Save as PDF</span>
+          </button>
+        </div>
+
+        <article id="summary-sheet" class="summary-document">
+          <p style="color:var(--text-secondary);">Compiling your legacy summary dossier…</p>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html">Digital Assets</a>
+        <a href="memories.html">Memories &amp; Letters</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      window.MV_UI.renderSidebar('summary');
+      const user = await window.MV_UI.requireAuth();
+      if (!user) return;
+
+      const { escapeHtml, formatDate, wishLabel, toast } = window.MV_UI;
+
+      function triggerPrint() {
+        window.print();
+      }
+      document.getElementById('main-print-btn').addEventListener('click', triggerPrint);
+      document.getElementById('header-print-btn').addEventListener('click', triggerPrint);
+
+      try {
+        const res = await window.MV_API.request('legacy_requests.php?action=summary');
+        const s = res.summary;
+        const u = s.user;
+
+        document.getElementById('summary-sheet').innerHTML = `
+          <header style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+            <div>
+              <div class="editorial-kicker">Official Personal Archive · Memory Vault</div>
+              <h1 style="font-size:2.1rem;">Digital Legacy Dossier</h1>
+              <p style="margin-top:6px;">Prepared by <strong>${escapeHtml(u.full_name)}</strong> (${escapeHtml(u.email)} · @${escapeHtml(u.user_handle)})</p>
+            </div>
+            <div style="text-align:right;font-size:0.84rem;color:var(--text-secondary);" class="tabular">
+              <div>Generated: ${escapeHtml(formatDate(s.generated_at, true))}</div>
+              <div>Last Check-In: ${escapeHtml(formatDate(u.last_check_in, true))}</div>
+            </div>
+          </header>
+
+          <section class="summary-section">
+            <h2>1. Inactivity Protocol &amp; General Guidance</h2>
+            <div class="grid-2" style="margin-bottom:14px;">
+              <div>
+                <strong>Reminder Schedule:</strong>
+                <div class="meta-line tabular" style="margin-top:4px;">
+                  <span>First: Day ${escapeHtml(u.first_reminder_days)}</span>
+                  <span class="meta-sep">·</span>
+                  <span>Second: Day ${escapeHtml(u.second_reminder_days)}</span>
+                  <span class="meta-sep">·</span>
+                  <span>Final: Day ${escapeHtml(u.final_reminder_days)}</span>
+                  <span class="meta-sep">·</span>
+                  <span>Contact Alert: Day ${escapeHtml(u.trusted_alert_days)}</span>
+                </div>
+              </div>
+              <div>
+                <strong>Security Policy:</strong>
+                <div style="font-size:0.86rem;color:var(--text-secondary);margin-top:4px;">
+                  No third-party account passwords are stored in this dossier. Official provider legacy procedures and admin verification apply.
+                </div>
+              </div>
+            </div>
+            ${u.general_guidance ? `<p style="font-style:italic;color:var(--text-primary);">“${escapeHtml(u.general_guidance)}”</p>` : ''}
+          </section>
+
+          <section class="summary-section">
+            <h2>2. Digital Assets &amp; Final Wishes (${s.assets.length})</h2>
+            ${s.assets.length === 0
+              ? '<p>No digital assets recorded yet.</p>'
+              : `
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Asset &amp; Platform</th>
+                        <th>Account Identifier</th>
+                        <th>Final Wish &amp; Steward</th>
+                        <th>Instructions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${s.assets.map((a) => `
+                        <tr>
+                          <td>
+                            <strong>${escapeHtml(a.asset_name)}</strong>
+                            <div style="font-size:0.82rem;color:var(--text-secondary);">${escapeHtml(a.platform)} · ${escapeHtml(a.category)}</div>
+                          </td>
+                          <td><code>${escapeHtml(a.account_identifier)}</code></td>
+                          <td>
+                            <div>${escapeHtml(wishLabel(a.action_type))}</div>
+                            ${a.assigned_contact_name ? `<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px;">Steward: ${escapeHtml(a.assigned_contact_name)}</div>` : ''}
+                          </td>
+                          <td style="font-size:0.86rem;">${escapeHtml(a.custom_instructions || a.notes || '—')}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `}
+          </section>
+
+          <section class="summary-section">
+            <h2>3. Trusted Contacts (${s.contacts.length})</h2>
+            ${s.contacts.length === 0
+              ? '<p>No trusted contacts designated yet.</p>'
+              : `
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Relationship</th>
+                        <th>Email &amp; Phone</th>
+                        <th>Invitation Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${s.contacts.map((c) => `
+                        <tr>
+                          <td><strong>${escapeHtml(c.name)}</strong></td>
+                          <td>${escapeHtml(c.relationship)}</td>
+                          <td>
+                            <div>${escapeHtml(c.email)}</div>
+                            ${c.phone ? `<div style="font-size:0.82rem;color:var(--text-secondary);" class="tabular">${escapeHtml(c.phone)}</div>` : ''}
+                          </td>
+                          <td style="text-transform:capitalize;">${escapeHtml(c.invitation_status)}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `}
+          </section>
+
+          <section class="summary-section">
+            <h2>4. Preserved Memories &amp; Farewell Letters (${s.memories.length})</h2>
+            ${s.memories.length === 0
+              ? '<p>No farewell letters recorded yet.</p>'
+              : s.memories.map((m) => `
+                  <div style="padding:18px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div class="meta-line" style="margin-bottom:4px;">
+                      <span>For: ${escapeHtml(m.contact_name || m.custom_recipient || 'Loved Ones')}</span>
+                      <span class="meta-sep">·</span>
+                      <span>${escapeHtml(m.release_condition)}</span>
+                    </div>
+                    <h3 style="margin-bottom:8px;">${escapeHtml(m.title)}</h3>
+                    <div style="white-space:pre-wrap;font-size:0.94rem;color:var(--text-primary);line-height:1.7;">${escapeHtml(m.message_body)}</div>
+                  </div>
+                `).join('')}
+          </section>
+        `;
+      } catch (err) {
+        toast(err.message || 'Could not compile summary.', 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

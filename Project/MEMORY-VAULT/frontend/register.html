@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="index.html">Home</a>
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+        <a href="login.html?role=admin">Admin Sign In</a>
+        <a href="login.html">Sign In</a>
+      </nav>
+      <div class="header-actions">
+        <a href="login.html" class="btn btn-outline btn-sm">Sign In</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container">
+      <div class="auth-wrapper card">
+        <div class="auth-header">
+          <div class="editorial-kicker">Vault User Registration</div>
+          <h1 style="font-size:2rem;">Create your vault</h1>
+          <p>Register a personal <strong>Vault User</strong> account to catalogue digital assets, write final wishes, and designate trusted contacts.</p>
+        </div>
+
+        <div class="notice-box" style="margin-bottom:20px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div>
+            <strong>Role Policy:</strong> New registrations create a <strong>Vault User</strong> account. Are you a designated verifier? <a href="login.html?role=admin" style="font-weight:600;text-decoration:underline;">Sign in as Administrator →</a>
+          </div>
+        </div>
+
+        <div id="register-error" class="notice-box notice-error" style="display:none;margin-bottom:18px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="register-error-text"></span>
+        </div>
+
+        <form id="register-form" novalidate>
+          <div class="form-grid" style="grid-template-columns:1fr;">
+            <div class="form-group">
+              <label for="full_name">Full Name</label>
+              <input id="full_name" name="full_name" type="text" required placeholder="e.g., Priya Sharma" autocomplete="name" />
+            </div>
+
+            <div class="form-group">
+              <label for="user_handle">Username / User ID</label>
+              <input id="user_handle" name="user_handle" type="text" required placeholder="e.g., priya_sharma" autocomplete="username" />
+              <span class="field-hint">3–40 characters (letters, numbers, dots, underscores, hyphens).</span>
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email Address</label>
+              <input id="email" name="email" type="email" required placeholder="you@example.com" autocomplete="email" />
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" required minlength="8" placeholder="Minimum 8 characters" autocomplete="new-password" />
+            </div>
+
+            <div class="form-group">
+              <label for="confirm_password">Confirm Password</label>
+              <input id="confirm_password" name="confirm_password" type="password" required minlength="8" placeholder="Re-enter your password" autocomplete="new-password" />
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top:22px;">
+            <button id="register-submit" type="submit" class="btn btn-primary btn-lg" style="width:100%;">
+              Create Vault User Account
+            </button>
+          </div>
+        </form>
+
+        <p style="margin-top:20px;font-size:0.9rem;text-align:center;">
+          Already have an account? <a href="login.html" style="font-weight:600;">Sign in here</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+        <a href="login.html?role=admin">Admin Sign In</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      try {
+        const session = await window.MV_API.initSession();
+        if (session.role === 'admin' && session.admin_authenticated) {
+          window.location.replace('admin.html');
+          return;
+        }
+        if (session.role === 'user' && session.authenticated) {
+          window.location.replace('dashboard.html');
+          return;
+        }
+      } catch (e) {}
+
+      const form = document.getElementById('register-form');
+      const errBox = document.getElementById('register-error');
+      const errText = document.getElementById('register-error-text');
+      const submitBtn = document.getElementById('register-submit');
+
+      function showError(msg) {
+        errText.textContent = msg;
+        errBox.style.display = 'flex';
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errBox.style.display = 'none';
+
+        const full_name = document.getElementById('full_name').value.trim();
+        const user_handle = document.getElementById('user_handle').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirm_password').value;
+
+        if (full_name.length < 2) return showError('Please enter your full name.');
+        if (!/^[a-zA-Z0-9._-]{3,40}$/.test(user_handle)) {
+          return showError('User ID must be 3–40 characters using letters, numbers, dots, underscores, or hyphens.');
+        }
+        if (!email.includes('@')) return showError('Please enter a valid email address.');
+        if (password.length < 8) return showError('Password must be at least 8 characters long.');
+        if (password !== confirm) return showError('Passwords do not match.');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating vault…';
+
+        try {
+          const res = await window.MV_API.request('auth.php?action=register', {
+            method: 'POST',
+            body: { full_name, user_handle, email, password, role: 'user' }
+          });
+          window.MV_UI.toast('Vault User account created. Opening your dashboard…');
+          setTimeout(() => { window.location.replace(res.redirect || 'dashboard.html'); }, 350);
+        } catch (err) {
+          showError(err.message || 'Registration failed.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Vault User Account';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

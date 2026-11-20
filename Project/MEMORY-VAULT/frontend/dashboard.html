@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="dashboard.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="dashboard.html" class="active">Dashboard</a>
+        <a href="assets.html">Assets</a>
+        <a href="wishes.html">Wishes</a>
+        <a href="contacts.html">Contacts</a>
+        <a href="memories.html">Memories</a>
+      </nav>
+      <div class="header-actions">
+        <button id="header-checkin-btn" type="button" class="btn btn-primary btn-sm">Check In Now</button>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <aside id="vault-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row">
+          <div>
+            <div class="editorial-kicker">Personal Vault Overview</div>
+            <h1 id="welcome-heading" style="font-size:2.1rem;">Your Legacy Dashboard</h1>
+            <p>Monitor your plan completion, confirm activity check-ins, and review your escalation schedule.</p>
+          </div>
+          <button id="main-checkin-btn" type="button" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Check In Now</span>
+          </button>
+        </div>
+
+        <!-- Live Summary Metric Tiles -->
+        <div class="metrics-grid">
+          <div class="metric-tile">
+            <span class="metric-label">Digital Assets</span>
+            <span id="metric-assets" class="metric-value">0</span>
+            <span id="metric-wishes-sub" class="metric-meta">0 final wishes assigned</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Trusted Contacts</span>
+            <span id="metric-contacts" class="metric-value">0</span>
+            <span id="metric-contacts-sub" class="metric-meta">0 accepted invitations</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Saved Memories</span>
+            <span id="metric-memories" class="metric-value">0</span>
+            <span class="metric-meta">Private farewell letters</span>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-label">Plan Completion</span>
+            <span id="metric-completion" class="metric-value">0%</span>
+            <div class="progress-track">
+              <div id="completion-bar" class="progress-fill" style="width:0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity & Check-In Status Card -->
+        <div class="card">
+          <div class="card-footer-row" style="margin-bottom:18px;">
+            <div>
+              <h2>Inactivity Monitoring Status</h2>
+              <p style="font-size:0.9rem;margin-top:4px;">Signing in or clicking Check In Now resets your timer to Day 0 and clears all escalation reminders.</p>
+            </div>
+            <span id="inactivity-badge" class="status-label status-success">Active</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="card-sand" style="padding:16px 18px;">
+              <div class="metric-label">Last Successful Check-In</div>
+              <div id="last-checkin-val" class="tabular" style="font-weight:600;margin-top:4px;font-size:0.98rem;">—</div>
+              <div id="days-inactive-val" class="metric-meta tabular" style="margin-top:2px;">0 days elapsed</div>
+            </div>
+
+            <div class="card-sand" style="padding:16px 18px;">
+              <div class="metric-label">Next Scheduled Reminder</div>
+              <div id="next-reminder-val" class="tabular" style="font-weight:600;margin-top:4px;font-size:0.98rem;">—</div>
+              <div class="metric-meta" style="margin-top:2px;">Stages: Day 30 · 35 · 40 · 45</div>
+            </div>
+
+            <div class="card-sand" style="padding:16px 18px;">
+              <div class="metric-label">Governance Safeguard</div>
+              <div style="font-weight:600;margin-top:4px;font-size:0.95rem;">Admin Verification Required</div>
+              <div class="metric-meta" style="margin-top:2px;">Inactivity alone never releases data</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Faculty Demo: Simulate Inactivity Widget -->
+        <div class="card">
+          <div class="editorial-kicker">Live Demonstration Control</div>
+          <h2>Faculty Demo: Simulate Inactivity</h2>
+          <p style="margin-top:6px;font-size:0.92rem;">
+            Test the complete 4-stage inactivity monitoring workflow (<code>check_inactivity.php</code>) with one click. Selecting any milestone shifts <code>last_check_in</code>, runs the escalation engine, prevents duplicate cycle emails, and updates the notification log below immediately.
+          </p>
+
+          <div class="demo-controls">
+            <button type="button" class="btn btn-outline btn-sm" data-sim-days="0">0 Days (Active)</button>
+            <button type="button" class="btn btn-outline btn-sm" data-sim-days="30">Simulate 30 Days</button>
+            <button type="button" class="btn btn-outline btn-sm" data-sim-days="35">Simulate 35 Days</button>
+            <button type="button" class="btn btn-outline btn-sm" data-sim-days="40">Simulate 40 Days</button>
+            <button type="button" class="btn btn-accent btn-sm" data-sim-days="45">Simulate 45+ Days (Alert Contacts)</button>
+          </div>
+
+          <div id="sim-feedback" class="notice-box notice-success" style="display:none;margin-top:16px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="sim-feedback-text"></span>
+          </div>
+
+          <hr class="divider" />
+
+          <h3 style="margin-bottom:12px;">Triggered Notification Logs</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Stage / Type</th>
+                  <th>Recipient</th>
+                  <th>Subject &amp; Delivery</th>
+                </tr>
+              </thead>
+              <tbody id="notif-logs-body">
+                <tr><td colspan="4" style="color:var(--text-secondary);">Loading notification logs…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Quick Navigation Cards to All Modules -->
+        <div>
+          <h2 style="margin-bottom:16px;">Manage Your Vault</h2>
+          <div class="grid-3">
+            <a href="assets.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 01</div>
+              <h3>Digital Assets</h3>
+              <p>Catalogue social, email, cloud, and subscription accounts without storing passwords.</p>
+            </a>
+            <a href="wishes.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 02</div>
+              <h3>Final Wishes</h3>
+              <p>Assign preservation, memorialization, or official deletion instructions per asset.</p>
+            </a>
+            <a href="contacts.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 03</div>
+              <h3>Trusted Contacts</h3>
+              <p>Manage invitations and keep your trusted wellness circle up to date.</p>
+            </a>
+            <a href="memories.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 04</div>
+              <h3>Memories &amp; Letters</h3>
+              <p>Write and organize personal farewell letters linked to specific recipients.</p>
+            </a>
+            <a href="summary.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 05</div>
+              <h3>Legacy Summary</h3>
+              <p>Review and print or save a complete PDF copy of your digital legacy dossier.</p>
+            </a>
+            <a href="legacy-access.html" class="pillar-card" style="color:inherit;">
+              <div class="pillar-index">Module 06</div>
+              <h3>Trusted Contact Portal</h3>
+              <p>Preview how trusted contacts submit verification requests and view approved items.</p>
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="summary.html">Printable Summary</a>
+        <a href="memories.html">Memories</a>
+        <a href="legacy-access.html">Trusted Contact Portal</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      window.MV_UI.renderSidebar('dashboard');
+      const user = await window.MV_UI.requireAuth();
+      if (!user) return;
+
+      const { escapeHtml, formatDate, statusClass, toast } = window.MV_UI;
+
+      function renderDashboard(data) {
+        const m = data.metrics;
+        document.getElementById('welcome-heading').textContent = `Welcome, ${data.user.full_name}`;
+        document.getElementById('metric-assets').textContent = m.total_assets;
+        document.getElementById('metric-wishes-sub').textContent = `${m.total_wishes} final wishes assigned`;
+        document.getElementById('metric-contacts').textContent = m.total_contacts;
+        document.getElementById('metric-contacts-sub').textContent = `${m.accepted_contacts} accepted invitations`;
+        document.getElementById('metric-memories').textContent = m.total_memories;
+        document.getElementById('metric-completion').textContent = `${m.completion_percent}%`;
+        document.getElementById('completion-bar').style.width = `${m.completion_percent}%`;
+
+        document.getElementById('last-checkin-val').textContent = formatDate(m.last_check_in, true);
+        document.getElementById('days-inactive-val').textContent = `${m.days_inactive} day${m.days_inactive === 1 ? '' : 's'} elapsed`;
+        document.getElementById('next-reminder-val').textContent = m.escalation_stage >= 4
+          ? 'Stage 4 Reached (Contacts Alerted)'
+          : formatDate(m.next_reminder_date, false);
+
+        const badge = document.getElementById('inactivity-badge');
+        badge.textContent = m.status_label;
+        badge.className = `status-label ${statusClass(m.status_tone)}`;
+
+        const tbody = document.getElementById('notif-logs-body');
+        const logs = data.recent_notifications || [];
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-secondary);">No notification logs recorded yet.</td></tr>';
+        } else {
+          tbody.innerHTML = logs.map((log) => `
+            <tr>
+              <td class="tabular" style="white-space:nowrap;font-size:0.84rem;">${escapeHtml(formatDate(log.created_at, true))}</td>
+              <td>
+                <div style="font-weight:600;font-size:0.86rem;">${escapeHtml(log.notification_type.replace(/_/g, ' '))}</div>
+                <div style="font-size:0.78rem;color:var(--text-secondary);">${escapeHtml(log.recipient_role)}</div>
+              </td>
+              <td style="font-size:0.86rem;">${escapeHtml(log.recipient_email)}</td>
+              <td>
+                <div style="font-weight:500;">${escapeHtml(log.subject)}</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:2px;">Status: ${escapeHtml(log.delivery_status)}</div>
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+
+      async function loadDashboard() {
+        try {
+          const res = await window.MV_API.request('dashboard.php');
+          renderDashboard(res.data);
+        } catch (err) {
+          toast(err.message || 'Unable to load dashboard.', 'error');
+        }
+      }
+
+      async function handleCheckIn() {
+        try {
+          const res = await window.MV_API.request('dashboard.php?action=checkin', {
+            method: 'POST',
+            body: {}
+          });
+          renderDashboard(res.data);
+          document.getElementById('sim-feedback').style.display = 'none';
+          toast(res.message || 'Check-in confirmed.');
+        } catch (err) {
+          toast(err.message || 'Check-in failed.', 'error');
+        }
+      }
+
+      document.getElementById('main-checkin-btn').addEventListener('click', handleCheckIn);
+      document.getElementById('header-checkin-btn').addEventListener('click', handleCheckIn);
+
+      document.querySelectorAll('[data-sim-days]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const days = Number(btn.getAttribute('data-sim-days'));
+          btn.disabled = true;
+          try {
+            const res = await window.MV_API.request('dashboard.php?action=simulate_inactivity', {
+              method: 'POST',
+              body: { days }
+            });
+            renderDashboard(res.data);
+            const fb = document.getElementById('sim-feedback');
+            const fbText = document.getElementById('sim-feedback-text');
+            const triggered = res.triggered || [];
+            if (days === 0) {
+              fbText.textContent = 'Timer reset to 0 days (Active). Escalation stage cleared.';
+            } else if (triggered.length > 0) {
+              fbText.textContent = `Simulated ${days} days inactive: triggered ${triggered.length} notification(s) — ${triggered.map((t) => t.summary).join(' ')}`;
+            } else {
+              fbText.textContent = `Simulated ${days} days inactive. Stage already evaluated in this cycle (duplicate notifications prevented).`;
+            }
+            fb.style.display = 'flex';
+            toast(res.message);
+          } catch (err) {
+            toast(err.message || 'Simulation failed.', 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      await loadDashboard();
+    })();
+  </script>
+</body>
+</html>

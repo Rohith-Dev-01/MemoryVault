@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Final Wishes — Memory Vault</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="dashboard.html" class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Memory Vault</span>
+      </a>
+      <nav id="primary-nav" class="primary-nav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html">Assets</a>
+        <a href="wishes.html" class="active">Wishes</a>
+        <a href="contacts.html">Contacts</a>
+        <a href="memories.html">Memories</a>
+      </nav>
+      <div class="header-actions">
+        <a href="summary.html" class="btn btn-outline btn-sm">View Summary</a>
+        <button id="mobile-menu-btn" type="button" class="mobile-menu-btn" aria-label="Toggle menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <div class="container app-shell">
+      <aside id="vault-sidebar" class="sidebar"></aside>
+
+      <section class="workspace-content">
+        <div class="page-heading-row">
+          <div>
+            <div class="editorial-kicker">Module 02 · Directives</div>
+            <h1 style="font-size:2.1rem;">Final Wishes</h1>
+            <p>Specify exact stewardship instructions for every digital asset and optionally authorize a specific trusted contact to view each instruction after admin verification.</p>
+          </div>
+          <a href="assets.html" class="btn btn-outline btn-sm">Manage Assets</a>
+        </div>
+
+        <div id="wishes-container" style="display:flex;flex-direction:column;gap:20px;">
+          <div class="card" style="color:var(--text-secondary);">Loading your digital assets and final wishes…</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>Memory Vault — Digital Legacy Management System</div>
+      <div class="footer-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="assets.html">Digital Assets</a>
+        <a href="summary.html">Printable Summary</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/script.js"></script>
+  <script>
+    (async function () {
+      window.MV_UI.renderSidebar('wishes');
+      const user = await window.MV_UI.requireAuth();
+      if (!user) return;
+
+      const { escapeHtml, toast } = window.MV_UI;
+      let items = [];
+      let contacts = [];
+
+      const actionOptions = [
+        { value: 'preserve_account', label: 'Preserve the account' },
+        { value: 'preserve_memories', label: 'Preserve selected memories' },
+        { value: 'share_information', label: 'Share selected information' },
+        { value: 'request_memorialization', label: 'Request memorialization' },
+        { value: 'request_deletion', label: 'Request deletion or cancellation through official provider process' }
+      ];
+
+      function renderWishes() {
+        const host = document.getElementById('wishes-container');
+        if (items.length === 0) {
+          host.innerHTML = `
+            <div class="empty-state">
+              <h3>No digital assets available yet</h3>
+              <p>Please add at least one digital asset before assigning final wishes.</p>
+              <a href="assets.html" class="btn btn-primary">Add Digital Asset</a>
+            </div>`;
+          return;
+        }
+
+        host.innerHTML = items.map((item) => `
+          <article class="card" data-asset-card="${item.asset_id}">
+            <div class="card-footer-row" style="margin-bottom:16px;">
+              <div>
+                <h3>${escapeHtml(item.asset_name)}</h3>
+                <div class="meta-line" style="margin-top:4px;">
+                  <span>${escapeHtml(item.platform)}</span>
+                  <span class="meta-sep">·</span>
+                  <span>${escapeHtml(item.category)}</span>
+                  <span class="meta-sep">·</span>
+                  <code>${escapeHtml(item.account_identifier)}</code>
+                </div>
+              </div>
+              <span class="status-label ${item.wish_id ? 'status-success' : 'status-neutral'}">
+                ${item.wish_id ? 'Wish Saved' : 'Unassigned'}
+              </span>
+            </div>
+
+            <form class="wish-form" data-asset-id="${item.asset_id}">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="action_${item.asset_id}">Desired Action</label>
+                  <select id="action_${item.asset_id}" name="action_type" required>
+                    <option value="">Select a final wish…</option>
+                    ${actionOptions.map((opt) => `
+                      <option value="${opt.value}" ${item.action_type === opt.value ? 'selected' : ''}>
+                        ${escapeHtml(opt.label)}
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="contact_${item.asset_id}">Authorized Trusted Contact (Optional)</label>
+                  <select id="contact_${item.asset_id}" name="assigned_contact_id">
+                    <option value="">Any approved steward / Not restricted</option>
+                    ${contacts.map((c) => `
+                      <option value="${c.id}" ${Number(item.assigned_contact_id) === Number(c.id) ? 'selected' : ''}>
+                        ${escapeHtml(c.name)} (${escapeHtml(c.relationship)})
+                      </option>
+                    `).join('')}
+                  </select>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="instr_${item.asset_id}">Custom Instructions</label>
+                  <textarea id="instr_${item.asset_id}" name="custom_instructions" placeholder="Provide step-by-step guidance for your trusted contact (never include passwords)…">${escapeHtml(item.custom_instructions || '')}</textarea>
+                </div>
+              </div>
+
+              <div class="form-actions" style="margin-top:14px;">
+                <button type="submit" class="btn btn-primary btn-sm">Save Final Wish</button>
+                ${item.wish_id ? `<button type="button" class="btn btn-danger btn-sm" data-clear-wish="${item.wish_id}">Clear Wish</button>` : ''}
+              </div>
+            </form>
+          </article>
+        `).join('');
+
+        host.querySelectorAll('.wish-form').forEach((form) => {
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const assetId = Number(form.dataset.assetId);
+            const actionType = form.querySelector('[name="action_type"]').value;
+            const assignedContactId = form.querySelector('[name="assigned_contact_id"]').value;
+            const customInstructions = form.querySelector('[name="custom_instructions"]').value.trim();
+
+            if (!actionType) {
+              toast('Please choose a desired action before saving.', 'warning');
+              return;
+            }
+
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+
+            try {
+              await window.MV_API.request('wishes.php', {
+                method: 'POST',
+                body: {
+                  asset_id: assetId,
+                  action_type: actionType,
+                  assigned_contact_id: assignedContactId ? Number(assignedContactId) : null,
+                  custom_instructions: customInstructions
+                }
+              });
+              toast('Final wish instructions saved.');
+              await loadWishes();
+            } catch (err) {
+              toast(err.message || 'Could not save final wish.', 'error');
+              btn.disabled = false;
+            }
+          });
+        });
+
+        host.querySelectorAll('[data-clear-wish]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const wishId = Number(btn.dataset.clearWish);
+            btn.disabled = true;
+            try {
+              await window.MV_API.request(`wishes.php?id=${wishId}`, { method: 'DELETE' });
+              toast('Final wish removed.');
+              await loadWishes();
+            } catch (err) {
+              toast(err.message || 'Could not remove wish.', 'error');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadWishes() {
+        try {
+          const res = await window.MV_API.request('wishes.php');
+          items = res.items || [];
+          contacts = res.contacts || [];
+          renderWishes();
+        } catch (err) {
+          toast(err.message || 'Unable to load final wishes.', 'error');
+        }
+      }
+
+      await loadWishes();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Memory Vault – Digital Legacy Management System",
+  "description": "A serene, secure digital legacy management system for organizing digital assets, final wishes, trusted contacts, farewell memories, inactivity monitoring, and admin-verified legacy access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
