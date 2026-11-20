@@ -4,7 +4,9 @@
 
 <p align=*center*> A full-stack digital legacy management platform to catalog digital assets, preserve personal memories, manage final wishes, and govern legacy access through multi-stage inactivity monitoring and administrative verification. </p>
 
-**[Memory Vault – Live Application](https://memory-vault-main.vercel.app/)**
+<p align=*center*> <a href=*[https://memory-vault-main.vercel.app/*>🚀](https://memory-vault-main.vercel.app/">🚀) Live Demo</a> </p>
+
+---
 
 ## 📌 About the Project
 

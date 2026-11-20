@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { Pool } from 'pg';
+import { createInMemoryPool, type DbPool } from './src/inMemoryDb.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,29 +14,53 @@ const PORT = Number(process.env.PORT || 3000);
 const MEMORY_VAULT_FRONTEND = path.resolve(__dirname, 'MEMORY-VAULT', 'frontend');
 
 // ============================================================================
-// Supabase PostgreSQL Pool (via DATABASE_URL secret)
+// Database Pool: Live PostgreSQL (via DATABASE_URL) with In-Memory Fallback
 // ============================================================================
 const rawDatabaseUrl = (process.env.DATABASE_URL || '').trim();
+const fallbackPool = createInMemoryPool();
 
-const pool = rawDatabaseUrl
-  ? new Pool({
+let pgPool: Pool | null = null;
+let activeDb: DbPool = fallbackPool;
+let dbMode: 'supabase_postgresql_connected' | 'in_memory_demo_store' = 'in_memory_demo_store';
+
+if (rawDatabaseUrl) {
+  try {
+    pgPool = new Pool({
       connectionString: rawDatabaseUrl,
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-    })
-  : null;
-
-function requirePool(res: Response): Pool | null {
-  if (!pool) {
-    res.status(500).json({
-      success: false,
-      error: 'DATABASE_URL is not configured. Add your Supabase Session Pooler URI in Settings → Secrets.',
+      connectionTimeoutMillis: 5000,
     });
-    return null;
+    pgPool.on('error', (err) => {
+      console.warn('[Memory Vault] PostgreSQL pool error — switching to in-memory store:', err.message);
+      activeDb = fallbackPool;
+      dbMode = 'in_memory_demo_store';
+    });
+    // Probe connectivity; keep PostgreSQL if reachable, otherwise fall back gracefully
+    pgPool
+      .query('SELECT 1')
+      .then(() => {
+        if (pgPool) {
+          activeDb = pgPool as unknown as DbPool;
+          dbMode = 'supabase_postgresql_connected';
+          console.log('[Memory Vault] Connected to PostgreSQL via DATABASE_URL.');
+        }
+      })
+      .catch((err: Error) => {
+        console.warn('[Memory Vault] PostgreSQL unreachable — using seeded in-memory store:', err.message);
+        activeDb = fallbackPool;
+        dbMode = 'in_memory_demo_store';
+      });
+  } catch (err) {
+    console.warn('[Memory Vault] Invalid DATABASE_URL — using seeded in-memory store:', (err as Error).message);
+    activeDb = fallbackPool;
+    dbMode = 'in_memory_demo_store';
   }
-  return pool;
+}
+
+function requirePool(_res: Response): DbPool {
+  return activeDb;
 }
 
 // ============================================================================
@@ -101,10 +126,11 @@ function attachSession(req: Request, res: Response, next: NextFunction) {
       csrfToken: crypto.randomBytes(32).toString('hex'),
     };
     sessions.set(sid, sess);
-    res.setHeader(
-      'Set-Cookie',
-      `MV_SESSION=${sid}; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=21600`
-    );
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    const cookieFlags = isHttps
+      ? 'Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=21600'
+      : 'Path=/; HttpOnly; SameSite=Lax; Max-Age=21600';
+    res.setHeader('Set-Cookie', `MV_SESSION=${sid}; ${cookieFlags}`);
   }
 
   (req as Request & { mvSession: SessionData }).mvSession = sess;
@@ -184,7 +210,7 @@ function requireAdminId(req: Request, res: Response): number | null {
 // Notification Logger & 4-Stage Inactivity Engine (Supabase PostgreSQL)
 // ============================================================================
 async function sendAndLogNotification(
-  db: Pool,
+  db: DbPool,
   userId: number | null,
   recipientEmail: string,
   recipientRole: string,
@@ -216,7 +242,7 @@ async function sendAndLogNotification(
   return true;
 }
 
-async function evaluateInactivityForUser(db: Pool, userId: number) {
+async function evaluateInactivityForUser(db: DbPool, userId: number) {
   const { rows } = await db.query(
     `SELECT u.id, u.user_handle, u.full_name, u.email, u.last_check_in,
             u.escalation_stage, u.inactivity_cycle_id,
@@ -375,7 +401,7 @@ async function evaluateInactivityForUser(db: Pool, userId: number) {
   return { evaluated: true, user_id: userId, days_inactive: daysInactive, stage: newStage, triggered };
 }
 
-async function buildDashboardPayload(db: Pool, userId: number) {
+async function buildDashboardPayload(db: DbPool, userId: number) {
   const { rows: userRows } = await db.query(
     `SELECT u.id, u.user_handle, u.full_name, u.email, u.last_check_in,
             u.escalation_stage, u.inactivity_cycle_id, u.created_at,
@@ -494,22 +520,21 @@ app.use(attachSession);
 
 const apiRouter = express.Router();
 
-// Health check endpoint (verifies live Supabase PostgreSQL connectivity)
+// Health check endpoint
 apiRouter.get('/health', async (_req, res) => {
   const db = requirePool(res);
-  if (!db) return;
   try {
     const r = await db.query('SELECT COUNT(*)::INT AS user_count FROM users');
     return res.json({
       success: true,
-      database: 'supabase_postgresql_connected',
+      database: dbMode,
       users_in_db: r.rows[0].user_count,
     });
   } catch (err) {
-    console.error('Supabase health check failed:', (err as Error).message);
+    console.error('Database health check failed:', (err as Error).message);
     return res.status(500).json({
       success: false,
-      error: 'Could not query Supabase tables. Verify DATABASE_URL and that supabase_schema.sql has been executed.',
+      error: 'Could not query database tables.',
     });
   }
 });
@@ -1765,6 +1790,6 @@ app.get('/:page.html', (req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(
-    `Memory Vault server running at http://0.0.0.0:${PORT} (Database: ${pool ? 'Supabase PostgreSQL via DATABASE_URL' : 'NOT CONFIGURED'})`
+    `Memory Vault server running at http://0.0.0.0:${PORT} (Database: ${dbMode === 'supabase_postgresql_connected' ? 'PostgreSQL via DATABASE_URL' : 'Seeded In-Memory Store'})`
   );
 });
