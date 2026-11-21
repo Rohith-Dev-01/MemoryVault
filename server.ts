@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { Pool } from 'pg';
-import { createInMemoryPool, type DbPool } from './src/inMemoryDb.ts';
+import { createInMemoryPool, type DbPool } from './src/inMemoryDb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,26 +32,28 @@ if (rawDatabaseUrl) {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     });
+    // Use PostgreSQL immediately when DATABASE_URL is configured (prevents serverless cold-start race)
+    activeDb = pgPool as unknown as DbPool;
+    dbMode = 'supabase_postgresql_connected';
+
     pgPool.on('error', (err) => {
       console.warn('[Memory Vault] PostgreSQL pool error — switching to in-memory store:', err.message);
       activeDb = fallbackPool;
       dbMode = 'in_memory_demo_store';
     });
-    // Probe connectivity; keep PostgreSQL if reachable, otherwise fall back gracefully
-    pgPool
-      .query('SELECT 1')
-      .then(() => {
-        if (pgPool) {
-          activeDb = pgPool as unknown as DbPool;
-          dbMode = 'supabase_postgresql_connected';
+
+    if (!process.env.VERCEL) {
+      pgPool
+        .query('SELECT 1')
+        .then(() => {
           console.log('[Memory Vault] Connected to PostgreSQL via DATABASE_URL.');
-        }
-      })
-      .catch((err: Error) => {
-        console.warn('[Memory Vault] PostgreSQL unreachable — using seeded in-memory store:', err.message);
-        activeDb = fallbackPool;
-        dbMode = 'in_memory_demo_store';
-      });
+        })
+        .catch((err: Error) => {
+          console.warn('[Memory Vault] PostgreSQL unreachable — using seeded in-memory store:', err.message);
+          activeDb = fallbackPool;
+          dbMode = 'in_memory_demo_store';
+        });
+    }
   } catch (err) {
     console.warn('[Memory Vault] Invalid DATABASE_URL — using seeded in-memory store:', (err as Error).message);
     activeDb = fallbackPool;
@@ -1788,8 +1790,12 @@ app.get('/:page.html', (req, res, next) => {
   return next();
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(
-    `Memory Vault server running at http://0.0.0.0:${PORT} (Database: ${dbMode === 'supabase_postgresql_connected' ? 'PostgreSQL via DATABASE_URL' : 'Seeded In-Memory Store'})`
-  );
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(
+      `Memory Vault server running at http://0.0.0.0:${PORT} (Database: ${dbMode === 'supabase_postgresql_connected' ? 'PostgreSQL via DATABASE_URL' : 'Seeded In-Memory Store'})`
+    );
+  });
+}
+
+export default app;

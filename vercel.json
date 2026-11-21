@@ -1,13 +1,32 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "server.ts", "use": "@vercel/node" },
-    { "src": "MEMORY-VAULT/frontend/**", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/server.ts" },
-    { "src": "^/$", "dest": "/MEMORY-VAULT/frontend/index.html" },
-    { "src": "/MEMORY-VAULT/frontend/(.*)", "dest": "/MEMORY-VAULT/frontend/$1" },
-    { "src": "/(.*)", "dest": "/MEMORY-VAULT/frontend/$1" }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/",
+      "destination": "/MEMORY-VAULT/frontend/index.html"
+    },
+    {
+      "source": "/css/:path*",
+      "destination": "/MEMORY-VAULT/frontend/css/:path*"
+    },
+    {
+      "source": "/js/:path*",
+      "destination": "/MEMORY-VAULT/frontend/js/:path*"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "/MEMORY-VAULT/frontend/assets/:path*"
+    },
+    {
+      "source": "/:page.html",
+      "destination": "/MEMORY-VAULT/frontend/:page.html"
+    }
   ]
 }

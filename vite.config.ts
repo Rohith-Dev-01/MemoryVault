@@ -25,6 +25,17 @@ export default defineConfig(() => {
           if (fs.existsSync(distDir) && fs.existsSync(srcAssets)) {
             fs.cpSync(srcAssets, distAssets, {recursive: true, force: true});
           }
+          const mvFrontend = path.resolve(__dirname, 'MEMORY-VAULT/frontend');
+          const distMvFrontend = path.resolve(distDir, 'MEMORY-VAULT/frontend');
+          if (fs.existsSync(distDir) && fs.existsSync(mvFrontend)) {
+            fs.cpSync(mvFrontend, distMvFrontend, {recursive: true, force: true});
+            if (process.env.VERCEL) {
+              const mvIndex = path.resolve(distMvFrontend, 'index.html');
+              if (fs.existsSync(mvIndex)) {
+                fs.copyFileSync(mvIndex, path.resolve(distDir, 'index.html'));
+              }
+            }
+          }
         },
       },
     ],
