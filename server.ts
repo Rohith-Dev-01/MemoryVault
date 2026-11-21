@@ -402,8 +402,126 @@ function requireAdminId(req: Request, res: Response): number | null {
 }
 
 // ============================================================================
-// Notification Logger & 4-Stage Inactivity Engine (Supabase PostgreSQL)
+// Notification Logger, Brevo Transactional Email & 4-Stage Inactivity Engine
 // ============================================================================
+const BREVO_SMTP_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+const BREVO_TIMEOUT_MS = 8000;
+
+function escapeHtml(value: string): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildNotificationEmailHtml(subject: string, body: string, notificationType: string): string {
+  const safeSubject = escapeHtml(subject);
+  const safeCategory = escapeHtml(notificationType.replace(/_/g, ' ').toUpperCase());
+  const paragraphs = String(body || '')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 14px 0;color:#2C3530;font-size:15px;line-height:1.65;">${escapeHtml(p).replace(/\n/g, '<br />')}</p>`
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>${safeSubject}</title></head>
+<body style="margin:0;padding:24px;background-color:#F5F1E8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin:0 auto;background-color:#FCFBF8;border:1px solid #DED7C8;border-radius:12px;overflow:hidden;">
+    <tr>
+      <td style="background-color:#1F3B2F;padding:22px 28px;">
+        <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#D8CFC0;margin-bottom:6px;">Memory Vault &middot; ${safeCategory}</div>
+        <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:600;color:#FCFBF8;line-height:1.3;">${safeSubject}</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:26px 28px 18px 28px;">
+        ${paragraphs || `<p style="margin:0;color:#2C3530;font-size:15px;line-height:1.65;">${escapeHtml(body)}</p>`}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 28px 22px 28px;border-top:1px solid #EAE4D7;background-color:#F8F5EE;">
+        <p style="margin:0;font-size:12px;color:#6B706B;line-height:1.5;">
+          This is an automated stewardship notice from <strong>Memory Vault</strong>. Private digital assets and farewell messages remain protected under admin-verified release rules.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+async function deliverEmailViaBrevo(
+  recipientEmail: string,
+  subject: string,
+  body: string,
+  notificationType: string
+): Promise<'sent_via_brevo' | 'logged_demo_fallback' | 'brevo_delivery_failed'> {
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  if (!apiKey) {
+    return 'logged_demo_fallback';
+  }
+
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || '').trim();
+  if (!senderEmail || !isValidEmail(senderEmail)) {
+    console.warn(
+      '[Memory Vault] BREVO_API_KEY is set but BREVO_SENDER_EMAIL is missing or invalid. Recording as logged_demo_fallback.'
+    );
+    return 'logged_demo_fallback';
+  }
+
+  if (!isValidEmail(recipientEmail)) {
+    console.warn(`[Memory Vault] Skipped Brevo delivery: invalid recipient email for ${notificationType}.`);
+    return 'brevo_delivery_failed';
+  }
+
+  const cleanSubject = subject.replace(/[\r\n]+/g, ' ').trim();
+  const htmlContent = buildNotificationEmailHtml(cleanSubject, body, notificationType);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), BREVO_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(BREVO_SMTP_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'Memory Vault', email: senderEmail },
+        to: [{ email: recipientEmail }],
+        subject: cleanSubject,
+        htmlContent,
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 201) {
+      return 'sent_via_brevo';
+    }
+
+    const errText = await response.text().catch(() => '');
+    const snippet = errText.replace(/\s+/g, ' ').slice(0, 300);
+    console.error(
+      `[Memory Vault] Brevo email delivery failed (HTTP ${response.status}) for ${notificationType}: ${snippet || 'No response body'}`
+    );
+    return 'brevo_delivery_failed';
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[Memory Vault] Brevo email request error for ${notificationType}: ${msg}`);
+    return 'brevo_delivery_failed';
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function sendAndLogNotification(
   db: DbPool,
   userId: number | null,
@@ -427,11 +545,13 @@ async function sendAndLogNotification(
     if (dup.rowCount && dup.rowCount > 0) return false;
   }
 
+  const deliveryStatus = await deliverEmailViaBrevo(email, subject, body, notificationType);
+
   await db.query(
     `INSERT INTO notification_logs
        (user_id, recipient_email, recipient_role, notification_type, cycle_id, subject, body, delivery_status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [userId, email, recipientRole, notificationType, cycleId, subject, body, 'logged_demo_fallback']
+    [userId, email, recipientRole, notificationType, cycleId, subject, body, deliveryStatus]
   );
 
   return true;
