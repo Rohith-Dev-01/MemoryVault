@@ -1070,7 +1070,14 @@ export function createInMemoryPool(): DbPool {
       return ok([{ ...row }]);
     }
 
-    if (sql.startsWith('UPDATE trusted_contacts SET invitation_status = $1, responded_at = CASE')) {
+    if (sql.startsWith('ALTER TABLE trusted_contacts')) {
+      return ok([]);
+    }
+
+    if (
+      sql.startsWith('UPDATE trusted_contacts SET invitation_status = $1, responded_at = ') &&
+      sql.includes('WHERE id = $2 AND user_id = $3')
+    ) {
       const status = String(params[0]) as 'pending' | 'accepted' | 'declined';
       const id = Number(params[1]);
       const uid = Number(params[2]);

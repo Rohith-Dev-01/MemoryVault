@@ -1436,6 +1436,95 @@ apiRouter.all(['/wishes.php', '/wishes'], async (req, res) => {
   }
 });
 
+// Idempotent schema safeguard for trusted_contacts columns on live PostgreSQL
+let trustedContactsSchemaVerified = false;
+async function ensureTrustedContactsColumns(db: DbPool): Promise<void> {
+  if (trustedContactsSchemaVerified || !pgPool) return;
+  try {
+    await db.query(
+      `ALTER TABLE trusted_contacts
+         ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ NULL,
+         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+    );
+    trustedContactsSchemaVerified = true;
+  } catch (err) {
+    const pgErr = err as { code?: string; message?: string };
+    console.warn(
+      '[Memory Vault] trusted_contacts column check skipped:',
+      pgErr.code || '',
+      pgErr.message || String(err)
+    );
+    trustedContactsSchemaVerified = true;
+  }
+}
+
+async function handleInvitationLookup(db: DbPool, req: Request, res: Response) {
+  const token = cleanStr(req.query.token, 80);
+  if (!token) return res.status(422).json({ success: false, error: 'Invitation token is required.' });
+
+  const { rows } = await db.query(
+    `SELECT tc.id, tc.name, tc.email, tc.relationship, tc.invitation_status, tc.responded_at,
+            u.full_name AS owner_name, u.user_handle AS owner_handle
+     FROM trusted_contacts tc
+     JOIN users u ON u.id = tc.user_id
+     WHERE tc.invitation_token = $1
+     LIMIT 1`,
+    [token]
+  );
+  if (!rows[0]) return res.status(404).json({ success: false, error: 'Invitation link is invalid or expired.' });
+  return res.json({ success: true, invitation: rows[0] });
+}
+
+async function handleInvitationResponse(db: DbPool, req: Request, res: Response) {
+  if (!verifyCsrf(req, res)) return;
+  const token = cleanStr(req.body?.token || req.query.token, 80);
+  const decision = cleanStr(
+    req.body?.decision || req.body?.invitation_status || req.body?.status,
+    20
+  ).toLowerCase();
+
+  if (!token || !['accepted', 'declined'].includes(decision)) {
+    return res.status(422).json({
+      success: false,
+      error: 'Valid token and decision (accepted or declined) are required.',
+    });
+  }
+
+  await ensureTrustedContactsColumns(db);
+
+  const { rows } = await db.query(
+    `UPDATE trusted_contacts
+     SET invitation_status = $1,
+         responded_at = NOW(),
+         updated_at = NOW()
+     WHERE invitation_token = $2
+     RETURNING id, user_id, name, email, invitation_status, responded_at`,
+    [decision, token]
+  );
+  const updated = rows[0];
+  if (!updated) return res.status(404).json({ success: false, error: 'Invitation not found.' });
+
+  const ownerRes = await db.query('SELECT email, full_name FROM users WHERE id = $1 LIMIT 1', [updated.user_id]);
+  if (ownerRes.rows[0]) {
+    await sendAndLogNotification(
+      db,
+      Number(updated.user_id),
+      ownerRes.rows[0].email,
+      'user',
+      `invitation_${decision}`,
+      `Trusted Contact ${updated.name} ${decision} your invitation`,
+      `Hello ${ownerRes.rows[0].full_name}, ${updated.name} (${updated.email}) has ${decision} your Trusted Contact invitation.`,
+      '',
+      false
+    );
+  }
+  return res.json({
+    success: true,
+    message: `Invitation marked as ${decision}. Private vault data remains protected.`,
+    invitation: updated,
+  });
+}
+
 // 5. contacts / contacts.php
 apiRouter.all(['/contacts.php', '/contacts'], async (req, res) => {
   const db = requirePool(res);
@@ -1445,64 +1534,18 @@ apiRouter.all(['/contacts.php', '/contacts'], async (req, res) => {
   try {
     // Public Invitation Lookup
     if (req.method === 'GET' && action === 'invitation') {
-      const token = cleanStr(req.query.token, 80);
-      if (!token) return res.status(422).json({ success: false, error: 'Invitation token is required.' });
-
-      const { rows } = await db.query(
-        `SELECT tc.id, tc.name, tc.email, tc.relationship, tc.invitation_status, tc.responded_at,
-                u.full_name AS owner_name, u.user_handle AS owner_handle
-         FROM trusted_contacts tc
-         JOIN users u ON u.id = tc.user_id
-         WHERE tc.invitation_token = $1
-         LIMIT 1`,
-        [token]
-      );
-      if (!rows[0]) return res.status(404).json({ success: false, error: 'Invitation link is invalid or expired.' });
-      return res.json({ success: true, invitation: rows[0] });
+      return await handleInvitationLookup(db, req, res);
     }
 
     // Public Invitation Response
     if (req.method === 'POST' && action === 'respond_invitation') {
-      if (!verifyCsrf(req, res)) return;
-      const token = cleanStr(req.body?.token, 80);
-      const decision = cleanStr(req.body?.decision, 20);
-      if (!token || !['accepted', 'declined'].includes(decision)) {
-        return res.status(422).json({ success: false, error: 'Valid token and decision are required.' });
-      }
-
-      const { rows } = await db.query(
-        `UPDATE trusted_contacts
-         SET invitation_status = $1, responded_at = NOW(), updated_at = NOW()
-         WHERE invitation_token = $2
-         RETURNING id, user_id, name, email, invitation_status, responded_at`,
-        [decision, token]
-      );
-      const updated = rows[0];
-      if (!updated) return res.status(404).json({ success: false, error: 'Invitation not found.' });
-
-      const ownerRes = await db.query('SELECT email, full_name FROM users WHERE id = $1 LIMIT 1', [updated.user_id]);
-      if (ownerRes.rows[0]) {
-        await sendAndLogNotification(
-          db,
-          Number(updated.user_id),
-          ownerRes.rows[0].email,
-          'user',
-          `invitation_${decision}`,
-          `Trusted Contact ${updated.name} ${decision} your invitation`,
-          `Hello ${ownerRes.rows[0].full_name}, ${updated.name} (${updated.email}) has ${decision} your Trusted Contact invitation.`,
-          '',
-          false
-        );
-      }
-      return res.json({
-        success: true,
-        message: `Invitation marked as ${decision}. Private vault data remains protected.`,
-        invitation: updated,
-      });
+      return await handleInvitationResponse(db, req, res);
     }
 
     const userId = requireUserId(req, res);
     if (!userId) return;
+
+    await ensureTrustedContactsColumns(db);
 
     if (req.method === 'GET') {
       const { rows } = await db.query(
@@ -1567,19 +1610,28 @@ apiRouter.all(['/contacts.php', '/contacts'], async (req, res) => {
       if (id <= 0) return res.status(422).json({ success: false, error: 'Valid contact ID is required.' });
 
       if (body.action === 'simulate_status') {
-        const status = cleanStr(body.invitation_status, 20);
+        const status = cleanStr(body.invitation_status || body.status, 20).toLowerCase();
         if (!['pending', 'accepted', 'declined'].includes(status)) {
           return res.status(422).json({ success: false, error: 'Status must be pending, accepted, or declined.' });
         }
-        const { rows } = await db.query(
-          `UPDATE trusted_contacts
-           SET invitation_status = $1,
-               responded_at = CASE WHEN $1 = 'pending' THEN NULL ELSE NOW() END,
-               updated_at = NOW()
-           WHERE id = $2 AND user_id = $3
-           RETURNING id, name, email, phone, relationship, invitation_token, invitation_status, responded_at`,
-          [status, id, userId]
-        );
+
+        // Avoid reusing $1 across VARCHAR assignment and TEXT comparison (PostgreSQL 42P08)
+        const updateSql =
+          status === 'pending'
+            ? `UPDATE trusted_contacts
+               SET invitation_status = $1,
+                   responded_at = NULL,
+                   updated_at = NOW()
+               WHERE id = $2 AND user_id = $3
+               RETURNING id, name, email, phone, relationship, invitation_token, invitation_status, responded_at`
+            : `UPDATE trusted_contacts
+               SET invitation_status = $1,
+                   responded_at = NOW(),
+                   updated_at = NOW()
+               WHERE id = $2 AND user_id = $3
+               RETURNING id, name, email, phone, relationship, invitation_token, invitation_status, responded_at`;
+
+        const { rows } = await db.query(updateSql, [status, id, userId]);
         if (!rows[0]) return res.status(404).json({ success: false, error: 'Trusted contact not found.' });
         return res.json({
           success: true,
@@ -1617,8 +1669,37 @@ apiRouter.all(['/contacts.php', '/contacts'], async (req, res) => {
 
     return res.status(405).json({ success: false, error: 'Method not allowed.' });
   } catch (err) {
-    console.error('Contacts API error:', (err as Error).message);
+    const pgErr = err as { code?: string; message?: string; detail?: string };
+    console.error('Contacts API error:', {
+      code: pgErr.code,
+      message: pgErr.message || String(err),
+      detail: pgErr.detail,
+    });
     return res.status(500).json({ success: false, error: 'Database error while managing trusted contacts.' });
+  }
+});
+
+// 5b. contact-portal — Public Trusted Contact Invitation Accept / Decline endpoint
+apiRouter.all(['/contact-portal', '/contact-portal/respond'], async (req, res) => {
+  const db = requirePool(res);
+  if (!db) return;
+
+  try {
+    if (req.method === 'GET') {
+      return await handleInvitationLookup(db, req, res);
+    }
+    if (req.method === 'POST' || req.method === 'PUT') {
+      return await handleInvitationResponse(db, req, res);
+    }
+    return res.status(405).json({ success: false, error: 'Method not allowed.' });
+  } catch (err) {
+    const pgErr = err as { code?: string; message?: string; detail?: string };
+    console.error('Contact Portal API error:', {
+      code: pgErr.code,
+      message: pgErr.message || String(err),
+      detail: pgErr.detail,
+    });
+    return res.status(500).json({ success: false, error: 'Database error while updating invitation status.' });
   }
 });
 
