@@ -34,6 +34,35 @@ window.MV_API = (function () {
   }
 
   /**
+   * Normalize flat or nested server error payloads (e.g., { error: { code, message } })
+   * into a human-readable string so UI never renders "[object Object]".
+   */
+  function extractErrorMessage(payload, fallback) {
+    if (!payload) return fallback;
+    if (typeof payload === 'string') return payload;
+    if (payload instanceof Error) {
+      return extractErrorMessage(payload.message, fallback);
+    }
+    if (typeof payload === 'object') {
+      if (typeof payload.message === 'string' && payload.message.trim()) {
+        return payload.message.trim();
+      }
+      if (payload.error !== undefined && payload.error !== null) {
+        return extractErrorMessage(payload.error, fallback);
+      }
+      if (typeof payload.code === 'string' && payload.code.trim()) {
+        return payload.code.trim();
+      }
+      try {
+        return JSON.stringify(payload);
+      } catch (_e) {
+        return fallback;
+      }
+    }
+    return String(payload);
+  }
+
+  /**
    * Core Fetch wrapper with credentialed cookies and automatic CSRF header injection.
    */
   async function request(endpoint, options = {}) {
@@ -85,7 +114,9 @@ window.MV_API = (function () {
     }
 
     if (!response.ok || data.success === false) {
-      const err = new Error(data.error || `Request failed (${response.status})`);
+      const fallbackMsg = `Request failed (${response.status})`;
+      const message = extractErrorMessage(data, fallbackMsg);
+      const err = new Error(message);
       err.status = response.status;
       err.data = data;
       throw err;
@@ -98,6 +129,7 @@ window.MV_API = (function () {
     initSession,
     request,
     setCsrfToken,
-    getCsrfToken
+    getCsrfToken,
+    extractErrorMessage
   };
 })();

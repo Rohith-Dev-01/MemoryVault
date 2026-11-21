@@ -5,41 +5,58 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 import express, { type Request, type Response, type NextFunction } from 'express';
-import { Pool } from 'pg';
-import { createInMemoryPool, type DbPool } from './src/inMemoryDb';
+import pg from 'pg';
+import { createInMemoryPool, type DbPool } from './src/inMemoryDb.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
+
+const __dirname = (() => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return process.cwd();
+  }
+})();
+
 const PORT = Number(process.env.PORT || 3000);
 const MEMORY_VAULT_FRONTEND = path.resolve(__dirname, 'MEMORY-VAULT', 'frontend');
 
 // ============================================================================
-// Database Pool: Live PostgreSQL (via DATABASE_URL) with In-Memory Fallback
+// Database Pool: Live PostgreSQL (via DATABASE_URL) with Lazy In-Memory Fallback
 // ============================================================================
 const rawDatabaseUrl = (process.env.DATABASE_URL || '').trim();
-const fallbackPool = createInMemoryPool();
 
-let pgPool: Pool | null = null;
-let activeDb: DbPool = fallbackPool;
+let pgPool: pg.Pool | null = null;
+let fallbackPool: DbPool | null = null;
+let dbInitError: string | null = null;
 let dbMode: 'supabase_postgresql_connected' | 'in_memory_demo_store' = 'in_memory_demo_store';
+
+function getFallbackPool(): DbPool {
+  if (!fallbackPool) {
+    fallbackPool = createInMemoryPool();
+  }
+  return fallbackPool;
+}
 
 if (rawDatabaseUrl) {
   try {
     pgPool = new Pool({
       connectionString: rawDatabaseUrl,
       ssl: { rejectUnauthorized: false },
-      max: 10,
+      max: process.env.VERCEL ? 3 : 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     });
-    // Use PostgreSQL immediately when DATABASE_URL is configured (prevents serverless cold-start race)
-    activeDb = pgPool as unknown as DbPool;
     dbMode = 'supabase_postgresql_connected';
 
-    pgPool.on('error', (err) => {
-      console.warn('[Memory Vault] PostgreSQL pool error — switching to in-memory store:', err.message);
-      activeDb = fallbackPool;
-      dbMode = 'in_memory_demo_store';
+    // Always attach error listener so unhandled idle socket errors never crash Node
+    pgPool.on('error', (err: Error) => {
+      dbInitError = err.message;
+      console.error('[Memory Vault] PostgreSQL pool error:', err.message);
+      if (!process.env.VERCEL) {
+        pgPool = null;
+        dbMode = 'in_memory_demo_store';
+      }
     });
 
     if (!process.env.VERCEL) {
@@ -49,20 +66,25 @@ if (rawDatabaseUrl) {
           console.log('[Memory Vault] Connected to PostgreSQL via DATABASE_URL.');
         })
         .catch((err: Error) => {
+          dbInitError = err.message;
           console.warn('[Memory Vault] PostgreSQL unreachable — using seeded in-memory store:', err.message);
-          activeDb = fallbackPool;
+          pgPool = null;
           dbMode = 'in_memory_demo_store';
         });
     }
   } catch (err) {
-    console.warn('[Memory Vault] Invalid DATABASE_URL — using seeded in-memory store:', (err as Error).message);
-    activeDb = fallbackPool;
+    dbInitError = (err as Error).message;
+    console.warn('[Memory Vault] Invalid DATABASE_URL — using seeded in-memory store:', dbInitError);
+    pgPool = null;
     dbMode = 'in_memory_demo_store';
   }
 }
 
 function requirePool(_res: Response): DbPool {
-  return activeDb;
+  if (pgPool) {
+    return pgPool as unknown as DbPool;
+  }
+  return getFallbackPool();
 }
 
 // ============================================================================
@@ -107,7 +129,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
   for (const part of header.split(';')) {
     const idx = part.indexOf('=');
     if (idx > -1) {
-      out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+      const key = part.slice(0, idx).trim();
+      const rawVal = part.slice(idx + 1).trim();
+      try {
+        out[key] = decodeURIComponent(rawVal);
+      } catch {
+        out[key] = rawVal;
+      }
     }
   }
   return out;
@@ -533,10 +561,13 @@ apiRouter.get('/health', async (_req, res) => {
       users_in_db: r.rows[0].user_count,
     });
   } catch (err) {
-    console.error('Database health check failed:', (err as Error).message);
+    const msg = (err as Error).message || 'Unknown database error';
+    console.error('Database health check failed:', msg);
     return res.status(500).json({
       success: false,
-      error: 'Could not query database tables.',
+      database: dbMode,
+      error: `Database query failed: ${msg}`,
+      ...(dbInitError ? { init_error: dbInitError } : {}),
     });
   }
 });
@@ -1788,6 +1819,22 @@ app.get('/:page.html', (req, res, next) => {
     return res.redirect(`/MEMORY-VAULT/frontend/${req.params.page}.html`);
   }
   return next();
+});
+
+// Global Express JSON error middleware so unexpected runtime errors never crash the serverless function
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : 'Unexpected server error.';
+  console.error('[Memory Vault] Unhandled Express error:', message);
+  if (res.headersSent) return;
+  res.status(500).json({
+    success: false,
+    error: message,
+  });
 });
 
 if (!process.env.VERCEL) {

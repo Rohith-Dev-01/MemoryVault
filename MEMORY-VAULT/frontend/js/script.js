@@ -30,9 +30,38 @@ window.MV_UI = (function () {
   }
 
   /**
+   * Extract a readable message from strings, Error instances, or nested objects like { error: { code, message } }.
+   */
+  function formatErrorMessage(input, fallback = 'An unexpected error occurred.') {
+    if (!input) return fallback;
+    if (typeof input === 'string') return input;
+    if (input instanceof Error) {
+      return formatErrorMessage(input.message, fallback);
+    }
+    if (typeof input === 'object') {
+      if (typeof input.message === 'string' && input.message.trim()) {
+        return input.message.trim();
+      }
+      if (input.error !== undefined && input.error !== null) {
+        return formatErrorMessage(input.error, fallback);
+      }
+      if (typeof input.code === 'string' && input.code.trim()) {
+        return input.code.trim();
+      }
+      try {
+        return JSON.stringify(input);
+      } catch (_e) {
+        return fallback;
+      }
+    }
+    return String(input);
+  }
+
+  /**
    * Display a subtle editorial toast notification.
    */
   function toast(message, type = 'success') {
+    const text = formatErrorMessage(message, type === 'error' ? 'Request failed.' : '');
     let container = document.getElementById('mv-toast-container');
     if (!container) {
       container = document.createElement('div');
@@ -44,7 +73,7 @@ window.MV_UI = (function () {
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.setAttribute('role', 'status');
-    el.innerHTML = `<span>${escapeHtml(message)}</span>`;
+    el.innerHTML = `<span>${escapeHtml(text)}</span>`;
     container.appendChild(el);
 
     setTimeout(() => {
@@ -251,6 +280,7 @@ window.MV_UI = (function () {
   return {
     escapeHtml,
     formatDate,
+    formatErrorMessage,
     toast,
     requireAuth,
     requireAdminAuth,
