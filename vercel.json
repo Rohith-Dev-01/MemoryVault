@@ -6,6 +6,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/server.ts" },
+    { "src": "^/$", "dest": "/MEMORY-VAULT/frontend/index.html" },
     { "src": "/MEMORY-VAULT/frontend/(.*)", "dest": "/MEMORY-VAULT/frontend/$1" },
     { "src": "/(.*)", "dest": "/MEMORY-VAULT/frontend/$1" }
   ]
