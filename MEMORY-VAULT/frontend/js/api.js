@@ -1,29 +1,45 @@
 /**
- * MEMORY VAULT – Fetch API Client (Sessions + CSRF Token Handling)
+ * MEMORY VAULT – Fetch API Client (Stateless Sessions + Double-Submit CSRF Handling)
  */
 
 window.MV_API = (function () {
   let csrfToken = '';
 
+  function readCsrfCookie() {
+    if (typeof document === 'undefined' || !document.cookie) return '';
+    const parts = document.cookie.split(';');
+    for (const part of parts) {
+      const idx = part.indexOf('=');
+      if (idx === -1) continue;
+      const key = part.slice(0, idx).trim();
+      if (key === 'MV_CSRF') {
+        const raw = part.slice(idx + 1).trim();
+        try {
+          return decodeURIComponent(raw);
+        } catch (_e) {
+          return raw;
+        }
+      }
+    }
+    return '';
+  }
+
   function setCsrfToken(token) {
     if (token && typeof token === 'string') {
-      csrfToken = token;
+      csrfToken = token.trim();
     }
   }
 
   function getCsrfToken() {
-    return csrfToken;
+    return readCsrfCookie() || csrfToken;
   }
 
-  /**
-   * Fetch current session & CSRF token from auth.php?action=me
-   */
-  async function initSession() {
-    const res = await request('auth.php?action=me', { method: 'GET' });
-    if (res && res.csrf_token) {
-      setCsrfToken(res.csrf_token);
+  function syncTokenFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    const token = payload.csrf_token || payload.csrfToken;
+    if (token && typeof token === 'string') {
+      setCsrfToken(token);
     }
-    return res;
   }
 
   function resolveEndpoint(endpoint) {
@@ -31,6 +47,30 @@ window.MV_API = (function () {
     const usePhp = window.MV_CONFIG.USE_PHP_EXTENSION !== false;
     const normalized = usePhp ? endpoint : endpoint.replace(/\.php(?=\?|$)/i, '');
     return `${window.MV_CONFIG.API_BASE_URL}/${normalized}`;
+  }
+
+  /**
+   * Fetch current session & fresh CSRF token from auth?action=me with credentials included.
+   */
+  async function fetchFreshCsrfToken() {
+    const boot = await fetch(resolveEndpoint('auth.php?action=me'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' }
+    });
+    const bootJson = await boot.json().catch(() => ({}));
+    syncTokenFromPayload(bootJson);
+    if (!csrfToken) {
+      const cookieVal = readCsrfCookie();
+      if (cookieVal) setCsrfToken(cookieVal);
+    }
+    return bootJson;
+  }
+
+  async function initSession() {
+    const res = await request('auth.php?action=me', { method: 'GET' });
+    syncTokenFromPayload(res);
+    return res;
   }
 
   /**
@@ -65,33 +105,28 @@ window.MV_API = (function () {
   /**
    * Core Fetch wrapper with credentialed cookies and automatic CSRF header injection.
    */
-  async function request(endpoint, options = {}) {
+  async function request(endpoint, options = {}, _retriedCsrf = false) {
     const method = (options.method || 'GET').toUpperCase();
     const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
 
-    // Ensure CSRF token is loaded before any mutating request
-    if (isMutating && !csrfToken && !endpoint.startsWith('auth.php?action=me')) {
-      const boot = await fetch(resolveEndpoint('auth.php?action=me'), {
-        method: 'GET',
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      });
-      const bootJson = await boot.json().catch(() => ({}));
-      if (bootJson.csrf_token) {
-        setCsrfToken(bootJson.csrf_token);
+    // Ensure CSRF token is present before any mutating request
+    if (isMutating && !endpoint.startsWith('auth.php?action=me')) {
+      if (!getCsrfToken()) {
+        await fetchFreshCsrfToken();
       }
     }
 
     const headers = {
-      'Accept': 'application/json',
+      Accept: 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
       ...(options.headers || {})
     };
 
     if (isMutating) {
       headers['Content-Type'] = 'application/json';
-      if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
+      const activeToken = getCsrfToken();
+      if (activeToken) {
+        headers['X-CSRF-Token'] = activeToken;
       }
     }
 
@@ -109,8 +144,19 @@ window.MV_API = (function () {
       error: `Unexpected response format from server (HTTP ${response.status}).`
     }));
 
-    if (data && data.csrf_token) {
-      setCsrfToken(data.csrf_token);
+    syncTokenFromPayload(data);
+
+    // If a stale token triggered CSRF_INVALID (e.g., expired tab), refresh token once and retry cleanly
+    if (
+      isMutating &&
+      !_retriedCsrf &&
+      response.status === 401 &&
+      data &&
+      data.code === 'CSRF_INVALID'
+    ) {
+      csrfToken = '';
+      await fetchFreshCsrfToken();
+      return request(endpoint, options, true);
     }
 
     if (!response.ok || data.success === false) {

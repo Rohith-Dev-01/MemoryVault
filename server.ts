@@ -111,17 +111,30 @@ function isValidEmail(email: string): boolean {
 }
 
 // ============================================================================
-// Secure Cookie Sessions & CSRF Middleware
+// Stateless Signed Cookie Sessions & Double-Submit / HMAC CSRF Protection
+// Works seamlessly across Vercel Serverless cold starts & multiple instances
 // ============================================================================
+const SESSION_TTL_SECONDS = 21600; // 6 hours
+const CSRF_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+const SIGNING_KEY: Buffer = (() => {
+  const explicitSecret = (process.env.SESSION_SECRET || process.env.CSRF_SECRET || '').trim();
+  if (explicitSecret) {
+    return crypto.createHash('sha256').update(explicitSecret).digest();
+  }
+  // Derive a consistent signing key across Vercel serverless instances from DATABASE_URL when available
+  if (rawDatabaseUrl) {
+    return crypto.createHash('sha256').update(`mv-signing:${rawDatabaseUrl}`).digest();
+  }
+  return crypto.randomBytes(32);
+})();
+
 interface SessionData {
-  id: string;
   role: 'user' | 'admin' | null;
   userId: number | null;
   adminId: number | null;
   csrfToken: string;
 }
-
-const sessions = new Map<string, SessionData>();
 
 function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -141,29 +154,137 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return out;
 }
 
+function safeTimingEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function isHttpsRequest(req: Request): boolean {
+  const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return req.secure || proto === 'https';
+}
+
+function isCrossSiteIframeHost(req: Request): boolean {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+  return /\.run\.app(?::\d+)?$/i.test(host);
+}
+
+function buildCookieAttributes(req: Request, opts: { httpOnly: boolean; maxAge: number }): string {
+  const https = isHttpsRequest(req);
+  const parts = ['Path=/', `Max-Age=${opts.maxAge}`];
+  if (opts.httpOnly) parts.push('HttpOnly');
+  if (https && isCrossSiteIframeHost(req)) {
+    // AI Studio HTTPS preview runs inside a cross-site iframe
+    parts.push('Secure', 'SameSite=None', 'Partitioned');
+  } else {
+    parts.push('SameSite=Lax');
+    if (https) parts.push('Secure');
+  }
+  return parts.join('; ');
+}
+
+function signHmac(data: string): string {
+  return crypto.createHmac('sha256', SIGNING_KEY).update(data).digest('base64url');
+}
+
+function createSignedCsrfToken(): string {
+  const nonce = crypto.randomBytes(20).toString('hex');
+  const ts = Date.now().toString(36);
+  const payload = `${nonce}.${ts}`;
+  const sig = signHmac(`csrf:${payload}`);
+  return `${payload}.${sig}`;
+}
+
+function isValidSignedCsrfToken(token: string): boolean {
+  if (!token || token.length > 200) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const [nonce, tsStr, sig] = parts;
+  if (!/^[a-f0-9]{16,64}$/i.test(nonce) || !/^[0-9a-z]+$/i.test(tsStr) || !sig) return false;
+  const ts = parseInt(tsStr, 36);
+  if (!Number.isFinite(ts) || Date.now() - ts > CSRF_TTL_MS || ts > Date.now() + 60_000) {
+    return false;
+  }
+  const expected = signHmac(`csrf:${nonce}.${tsStr}`);
+  return safeTimingEqual(sig, expected);
+}
+
+function encodeSessionCookie(sess: Pick<SessionData, 'role' | 'userId' | 'adminId'>): string {
+  const payloadObj = {
+    role: sess.role,
+    userId: sess.userId,
+    adminId: sess.adminId,
+    exp: Date.now() + SESSION_TTL_SECONDS * 1000,
+  };
+  const encoded = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64url');
+  const sig = signHmac(`sess:${encoded}`);
+  return `${encoded}.${sig}`;
+}
+
+function decodeSessionCookie(raw: string | undefined): Pick<SessionData, 'role' | 'userId' | 'adminId'> | null {
+  if (!raw) return null;
+  const dotIdx = raw.indexOf('.');
+  if (dotIdx <= 0) return null;
+  const encoded = raw.slice(0, dotIdx);
+  const sig = raw.slice(dotIdx + 1);
+  if (!safeTimingEqual(sig, signHmac(`sess:${encoded}`))) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as {
+      role?: unknown;
+      userId?: unknown;
+      adminId?: unknown;
+      exp?: unknown;
+    };
+    if (typeof parsed.exp !== 'number' || parsed.exp < Date.now()) return null;
+    const role = parsed.role === 'user' || parsed.role === 'admin' ? parsed.role : null;
+    const userId = typeof parsed.userId === 'number' && Number.isFinite(parsed.userId) ? parsed.userId : null;
+    const adminId = typeof parsed.adminId === 'number' && Number.isFinite(parsed.adminId) ? parsed.adminId : null;
+    return { role, userId, adminId };
+  } catch {
+    return null;
+  }
+}
+
+function setCsrfCookie(req: Request, res: Response, token: string) {
+  // Not HttpOnly so browser JS can read MV_CSRF for double-submit header attachment
+  const attrs = buildCookieAttributes(req, { httpOnly: false, maxAge: 86400 });
+  res.append('Set-Cookie', `MV_CSRF=${encodeURIComponent(token)}; ${attrs}`);
+}
+
+function persistSessionCookie(req: Request, res: Response, sess: SessionData) {
+  if (!sess.role || (!sess.userId && !sess.adminId)) {
+    const clearAttrs = buildCookieAttributes(req, { httpOnly: true, maxAge: 0 });
+    res.append('Set-Cookie', `MV_SESSION=; ${clearAttrs}`);
+  } else {
+    const attrs = buildCookieAttributes(req, { httpOnly: true, maxAge: SESSION_TTL_SECONDS });
+    res.append('Set-Cookie', `MV_SESSION=${encodeURIComponent(encodeSessionCookie(sess))}; ${attrs}`);
+  }
+  setCsrfCookie(req, res, sess.csrfToken);
+}
+
 function attachSession(req: Request, res: Response, next: NextFunction) {
   const cookies = parseCookies(req.headers.cookie);
-  let sid = cookies['MV_SESSION'];
-  let sess = sid ? sessions.get(sid) : undefined;
+  const decoded = decodeSessionCookie(cookies['MV_SESSION']);
 
-  if (!sess) {
-    sid = crypto.randomBytes(24).toString('hex');
-    sess = {
-      id: sid,
-      role: null,
-      userId: null,
-      adminId: null,
-      csrfToken: crypto.randomBytes(32).toString('hex'),
-    };
-    sessions.set(sid, sess);
-    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    const cookieFlags = isHttps
-      ? 'Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=21600'
-      : 'Path=/; HttpOnly; SameSite=Lax; Max-Age=21600';
-    res.setHeader('Set-Cookie', `MV_SESSION=${sid}; ${cookieFlags}`);
+  let csrfToken = cookies['MV_CSRF'] || '';
+  const hasValidCsrfCookie = isValidSignedCsrfToken(csrfToken);
+  if (!hasValidCsrfCookie) {
+    csrfToken = createSignedCsrfToken();
+    setCsrfCookie(req, res, csrfToken);
   }
 
-  (req as Request & { mvSession: SessionData }).mvSession = sess;
+  const sess: SessionData = {
+    role: decoded?.role ?? null,
+    userId: decoded?.userId ?? null,
+    adminId: decoded?.adminId ?? null,
+    csrfToken,
+  };
+
+  (req as Request & { mvSession: SessionData; mvCookies: Record<string, string> }).mvSession = sess;
+  (req as Request & { mvSession: SessionData; mvCookies: Record<string, string> }).mvCookies = cookies;
   next();
 }
 
@@ -171,11 +292,36 @@ function getSession(req: Request): SessionData {
   return (req as Request & { mvSession: SessionData }).mvSession;
 }
 
+function verifySameOriginIfPresent(req: Request): boolean {
+  const origin = String(req.headers.origin || '').trim();
+  if (!origin) return true;
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').trim().toLowerCase();
+  if (!host) return true;
+  try {
+    const originHost = new URL(origin).host.toLowerCase();
+    return originHost === host;
+  } catch {
+    return false;
+  }
+}
+
 function verifyCsrf(req: Request, res: Response): boolean {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return true;
-  const sess = getSession(req);
-  const headerToken = String(req.headers['x-csrf-token'] || '');
-  if (!headerToken || !sess.csrfToken || headerToken.length !== sess.csrfToken.length) {
+
+  if (!verifySameOriginIfPresent(req)) {
+    res.status(401).json({
+      success: false,
+      code: 'CSRF_INVALID',
+      error: 'Cross-origin request blocked by CSRF policy.',
+    });
+    return false;
+  }
+
+  const cookies = (req as Request & { mvCookies?: Record<string, string> }).mvCookies || parseCookies(req.headers.cookie);
+  const cookieToken = String(cookies['MV_CSRF'] || '').trim();
+  const headerToken = String(req.headers['x-csrf-token'] || '').trim();
+
+  if (!headerToken) {
     res.status(401).json({
       success: false,
       code: 'CSRF_INVALID',
@@ -183,10 +329,29 @@ function verifyCsrf(req: Request, res: Response): boolean {
     });
     return false;
   }
-  if (!crypto.timingSafeEqual(Buffer.from(headerToken), Buffer.from(sess.csrfToken))) {
-    res.status(401).json({ success: false, code: 'CSRF_INVALID', error: 'Invalid CSRF security token.' });
+
+  // Stateless validation: accept either a valid HMAC-signed token OR a matching Double-Submit cookie token
+  const signedValid = isValidSignedCsrfToken(headerToken);
+  const doubleSubmitMatch =
+    Boolean(cookieToken) &&
+    headerToken.length >= 24 &&
+    safeTimingEqual(headerToken, cookieToken);
+
+  if (!signedValid && !doubleSubmitMatch) {
+    res.status(401).json({
+      success: false,
+      code: 'CSRF_INVALID',
+      error: 'Invalid CSRF security token.',
+    });
     return false;
   }
+
+  // Keep the validated token synced in cookie so subsequent requests stay consistent
+  if (signedValid && !doubleSubmitMatch) {
+    setCsrfCookie(req, res, headerToken);
+    getSession(req).csrfToken = headerToken;
+  }
+
   return true;
 }
 
@@ -619,6 +784,7 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
         user,
         admin,
         csrf_token: sess.csrfToken,
+        csrfToken: sess.csrfToken,
       });
     }
 
@@ -711,7 +877,8 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
       sess.adminId = null;
       sess.role = 'user';
       sess.userId = Number(newUser.id);
-      sess.csrfToken = crypto.randomBytes(32).toString('hex');
+      sess.csrfToken = createSignedCsrfToken();
+      persistSessionCookie(req, res, sess);
 
       return res.status(201).json({
         success: true,
@@ -720,6 +887,7 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
         message: 'Your Memory Vault account has been created in Supabase.',
         user: newUser,
         csrf_token: sess.csrfToken,
+        csrfToken: sess.csrfToken,
       });
     }
 
@@ -774,7 +942,8 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
         sess.userId = null;
         sess.role = 'admin';
         sess.adminId = Number(admin.id);
-        sess.csrfToken = crypto.randomBytes(32).toString('hex');
+        sess.csrfToken = createSignedCsrfToken();
+        persistSessionCookie(req, res, sess);
         return res.json({
           success: true,
           role: 'admin',
@@ -782,6 +951,7 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
           message: 'Signed in as Administrator. Opening Verification Console…',
           admin: { id: admin.id, full_name: admin.full_name, email: admin.email, role: admin.role },
           csrf_token: sess.csrfToken,
+          csrfToken: sess.csrfToken,
         });
       }
 
@@ -825,7 +995,8 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
       sess.adminId = null;
       sess.role = 'user';
       sess.userId = Number(user.id);
-      sess.csrfToken = crypto.randomBytes(32).toString('hex');
+      sess.csrfToken = createSignedCsrfToken();
+      persistSessionCookie(req, res, sess);
 
       return res.json({
         success: true,
@@ -834,6 +1005,7 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
         message: 'Welcome back. Your activity check-in timer has been refreshed.',
         user: updatedRows[0],
         csrf_token: sess.csrfToken,
+        csrfToken: sess.csrfToken,
       });
     }
 
@@ -841,8 +1013,14 @@ apiRouter.all(['/auth.php', '/auth'], async (req, res) => {
       sess.userId = null;
       sess.adminId = null;
       sess.role = null;
-      sess.csrfToken = crypto.randomBytes(32).toString('hex');
-      return res.json({ success: true, message: 'Signed out safely.', csrf_token: sess.csrfToken });
+      sess.csrfToken = createSignedCsrfToken();
+      persistSessionCookie(req, res, sess);
+      return res.json({
+        success: true,
+        message: 'Signed out safely.',
+        csrf_token: sess.csrfToken,
+        csrfToken: sess.csrfToken,
+      });
     }
 
     return res.status(400).json({ success: false, error: 'Unknown authentication action.' });
